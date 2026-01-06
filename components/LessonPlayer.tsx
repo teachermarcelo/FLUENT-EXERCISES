@@ -88,6 +88,7 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
 
   const handleAudioSubmit = async (blob: Blob) => {
     setIsSubmitting(true);
+    setFeedback(null);
     try {
       const reader = new FileReader();
       reader.readAsDataURL(blob);
@@ -99,6 +100,12 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
       };
     } catch (e) {
       console.error(e);
+      setFeedback({
+        type: FeedbackType.INCORRECT,
+        score: 0,
+        explanation: "Error processing audio.",
+        correction: "Please try again."
+      });
       setIsSubmitting(false);
     }
   };
@@ -107,11 +114,18 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
     if ((!answer.trim() && currentTask.type !== TaskType.READING) || isSubmitting) return;
 
     setIsSubmitting(true);
+    setFeedback(null);
     try {
       const result = await analyzeAnswer(currentTask.question, answer);
       setFeedback(result);
     } catch (e) {
       console.error(e);
+      setFeedback({
+        type: FeedbackType.INCORRECT,
+        score: 0,
+        explanation: "Verification failed.",
+        correction: "AI teacher is momentarily unavailable."
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -150,12 +164,12 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
     onUpdateProgress(updatedUser);
   };
 
-  const getFeedbackStyles = (type: FeedbackType) => {
+  const getFeedbackStyles = (type: string) => {
     switch (type) {
-      case FeedbackType.PERFECT: return { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', icon: '🟢' };
-      case FeedbackType.IMPROVABLE: return { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', icon: '🔵' };
-      case FeedbackType.UNNATURAL: return { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', icon: '🟠' };
-      case FeedbackType.INCORRECT: return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', icon: '🔴' };
+      case 'PERFECT': return { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', icon: '🟢' };
+      case 'IMPROVABLE': return { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', icon: '🔵' };
+      case 'UNNATURAL': return { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', icon: '🟠' };
+      default: return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', icon: '🔴' };
     }
   };
 
@@ -208,7 +222,7 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
       </header>
 
       <div className="grid grid-cols-1 gap-8">
-        <div className="bg-white p-10 md:p-14 rounded-[48px] border border-slate-200 shadow-xl shadow-slate-100 relative overflow-hidden">
+        <div className="bg-white p-10 md:p-14 rounded-[48px] border border-slate-200 shadow-xl shadow-slate-100 relative overflow-hidden min-h-[500px] flex flex-col">
            <div className="absolute top-0 right-0 p-10">
               <span className={`px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest ${
                 currentTask.type === TaskType.SPEAKING ? 'bg-rose-100 text-rose-600' :
@@ -220,7 +234,7 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
               </span>
            </div>
 
-           <div className="max-w-2xl mb-12">
+           <div className="max-w-2xl mb-8">
               <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest mb-4">Instructions</p>
               <h3 className="text-3xl font-bold text-slate-900 leading-tight">{currentTask.question}</h3>
               
@@ -241,13 +255,13 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
               )}
            </div>
 
-           <div className="space-y-6">
+           <div className="flex-1 space-y-6">
               {currentTask.type === TaskType.READING ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {currentTask.options?.map((opt) => (
                     <button
                       key={opt}
-                      disabled={!!feedback}
+                      disabled={!!feedback || isSubmitting}
                       onClick={() => { setAnswer(opt); }}
                       className={`p-6 rounded-[32px] border-2 font-bold text-lg text-left transition-all ${
                         answer === opt 
@@ -260,7 +274,7 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
                   ))}
                 </div>
               ) : currentTask.type === TaskType.SPEAKING ? (
-                <div className="flex flex-col items-center py-16 bg-slate-50 rounded-[48px] border-2 border-dashed border-slate-200 relative overflow-hidden group">
+                <div className="flex flex-col items-center py-12 bg-slate-50 rounded-[48px] border-2 border-dashed border-slate-200 relative overflow-hidden group">
                    {isRecording && (
                      <div className="absolute inset-0 bg-rose-50/50 flex items-center justify-center animate-pulse">
                         <div className="flex gap-2">
@@ -291,7 +305,7 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
                    )}
                    
                    {isSubmitting && (
-                     <div className="flex flex-col items-center gap-6">
+                     <div className="flex flex-col items-center gap-6 py-10">
                         <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
                         <p className="text-xs font-black text-indigo-600 uppercase tracking-widest animate-pulse">Gemini is evaluating...</p>
                      </div>
@@ -309,11 +323,11 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
            </div>
 
            {!feedback && currentTask.type !== TaskType.SPEAKING && (
-              <div className="mt-10 flex justify-end">
+              <div className="mt-auto flex justify-end">
                 <button
                   onClick={handleSubmit}
                   disabled={(!answer.trim() && currentTask.type !== TaskType.READING) || isSubmitting}
-                  className="px-12 py-5 bg-slate-900 text-white rounded-3xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 transition-all shadow-xl disabled:opacity-50 active:scale-95"
+                  className="px-12 py-5 bg-slate-900 text-white rounded-3xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 transition-all shadow-xl disabled:opacity-50 active:scale-95 mt-4"
                 >
                   {isSubmitting ? 'Verifying...' : 'Check Answer'}
                 </button>
@@ -321,7 +335,7 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
            )}
 
            {feedback && (
-            <div className={`mt-10 p-10 rounded-[48px] border-2 animate-slideUp ${styles?.bg} ${styles?.border}`}>
+            <div className={`mt-8 p-10 rounded-[48px] border-2 animate-slideUp ${styles?.bg} ${styles?.border}`}>
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
                   <span className="text-4xl">{styles?.icon}</span>
@@ -337,7 +351,7 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
                 )}
               </div>
               
-              {feedback.correction && feedback.type !== FeedbackType.PERFECT && (
+              {feedback.correction && (
                 <div className="mt-6 p-6 bg-white/50 rounded-3xl border border-white">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Coach Correction</p>
                   <p className="text-slate-800 font-bold">{feedback.correction}</p>
