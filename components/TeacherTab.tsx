@@ -4,7 +4,8 @@ import { UserProgress, ProficiencyLevel } from '../types';
 
 const TeacherTab: React.FC<{ currentUser: UserProgress }> = ({ currentUser }) => {
   const [myStudents, setMyStudents] = useState<UserProgress[]>([]);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showForm, setShowForm] = useState<'add' | 'edit' | null>(null);
+  const [editingUser, setEditingUser] = useState<UserProgress | null>(null);
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -15,138 +16,149 @@ const TeacherTab: React.FC<{ currentUser: UserProgress }> = ({ currentUser }) =>
 
   useEffect(() => {
     refreshData();
+    window.addEventListener('storage', refreshData);
+    return () => window.removeEventListener('storage', refreshData);
   }, [currentUser]);
 
   const refreshData = () => {
     const db = JSON.parse(localStorage.getItem('lingualeap_db') || '[]');
-    const students = db.filter((u: UserProgress) => 
-      u.role === 'student' && u.teacherId === currentUser.id
-    );
+    const students = db.filter((u: UserProgress) => u.role === 'student' && u.teacherId === currentUser.id);
     setMyStudents(students);
   };
 
-  const handleRegisterStudent = (e: React.FormEvent) => {
+  const generateFeedbackPoints = (s: UserProgress) => {
+    const points = [];
+    if (s.skills.speaking < 50) points.push("Praticar pronúncia de fonemas oclusivos.");
+    if (s.skills.writing < 40) points.push("Reforçar o uso de tempos verbais passados.");
+    if (s.xp < 100) points.push("Engajamento inicial baixo: sugerir módulos básicos.");
+    if (s.skills.listening < 50) points.push("Recomendar podcasts nível " + s.level);
+    if (s.streak === 0) points.push("Incentivar retorno diário para manter o ritmo.");
+    return points.slice(0, 5);
+  };
+
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.username.trim()) return;
-
     const db = JSON.parse(localStorage.getItem('lingualeap_db') || '[]');
-    const newStudent: UserProgress = {
-      id: `std-${Date.now()}`,
-      username: formData.username.trim(),
-      password: formData.password || '123456',
-      role: 'student',
-      level: formData.level,
-      email: formData.email,
-      whatsapp: formData.whatsapp,
-      teacherId: currentUser.id,
-      xp: 0,
-      streak: 0,
-      completedLessons: [],
-      skills: { speaking: 0, listening: 0, reading: 0, writing: 0 },
-      certificates: [],
-    };
-
-    localStorage.setItem('lingualeap_db', JSON.stringify([...db, newStudent]));
-    setFormData({ username: '', password: '', level: 'A1', email: '', whatsapp: '' });
-    setShowAddModal(false);
+    if (showForm === 'add') {
+      const newUser: UserProgress = {
+        id: `std-${Date.now()}`,
+        username: formData.username,
+        password: formData.password || '123',
+        role: 'student',
+        level: formData.level,
+        email: formData.email,
+        whatsapp: formData.whatsapp,
+        teacherId: currentUser.id,
+        xp: 0, streak: 0, completedLessons: [], certificates: [],
+        skills: { speaking: 10, listening: 10, reading: 10, writing: 10 }
+      };
+      localStorage.setItem('lingualeap_db', JSON.stringify([...db, newUser]));
+    } else if (showForm === 'edit' && editingUser) {
+      const updated = db.map((u: UserProgress) => u.id === editingUser.id ? { ...u, ...formData } : u);
+      localStorage.setItem('lingualeap_db', JSON.stringify(updated));
+    }
+    window.dispatchEvent(new Event('storage'));
+    setShowForm(null);
     refreshData();
   };
 
-  const formatTime = (seconds?: number) => {
-    if (!seconds) return "0m";
-    const mins = Math.floor(seconds / 60);
-    return mins > 0 ? `${mins}m` : `${seconds}s`;
+  const deleteUser = (id: string) => {
+    if (confirm("Remover este aluno permanentemente?")) {
+      const db = JSON.parse(localStorage.getItem('lingualeap_db') || '[]');
+      localStorage.setItem('lingualeap_db', JSON.stringify(db.filter((u: any) => u.id !== id)));
+      window.dispatchEvent(new Event('storage'));
+      refreshData();
+    }
   };
+
+  const resetPwd = (id: string) => {
+    const db = JSON.parse(localStorage.getItem('lingualeap_db') || '[]');
+    localStorage.setItem('lingualeap_db', JSON.stringify(db.map((u: any) => u.id === id ? {...u, password: '123'} : u)));
+    window.dispatchEvent(new Event('storage'));
+    alert("Senha resetada para 123");
+  };
+
+  const formatTime = (s?: number) => s ? `${Math.floor(s/60)}m ${s%60}s` : '0m';
 
   return (
     <div className="space-y-8 animate-fadeIn pb-20">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <header className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold font-heading text-slate-900 uppercase">Teacher Hub</h2>
-          <p className="text-slate-500 font-medium">Tracking {myStudents.length} active students in your learning circle.</p>
+          <h2 className="text-3xl font-black font-heading text-slate-900 uppercase">Teacher Hub</h2>
+          <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Managing {myStudents.length} Students</p>
         </div>
-        <button 
-          onClick={() => setShowAddModal(true)}
-          className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100"
-        >
-          Add New Student
-        </button>
+        <button onClick={() => { setFormData({username:'',password:'',level:'A1',email:'',whatsapp:''}); setShowForm('add'); }} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-indigo-700 shadow-xl shadow-indigo-100">Registrar Aluno</button>
       </header>
 
-      {showAddModal && (
+      {showForm && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-lg rounded-[40px] p-12 shadow-2xl relative animate-fadeIn">
-            <button onClick={() => setShowAddModal(false)} className="absolute top-8 right-8 text-slate-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" strokeLinecap="round"/></svg>
-            </button>
-            <h3 className="text-2xl font-bold mb-8 uppercase tracking-tight">Student Enrollment</h3>
-            <form onSubmit={handleRegisterStudent} className="space-y-5">
-              <input required value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} placeholder="STUDENT FULL NAME" className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold uppercase tracking-tight outline-none focus:border-indigo-600" />
+          <div className="bg-white w-full max-w-lg rounded-[40px] p-10 shadow-2xl relative">
+            <h3 className="text-2xl font-black mb-6 uppercase">{showForm === 'add' ? 'Novo Aluno' : 'Editar Aluno'}</h3>
+            <form onSubmit={handleSave} className="space-y-4">
+              <input required value={formData.username} onChange={e=>setFormData({...formData, username:e.target.value})} placeholder="NOME" className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold outline-none focus:border-indigo-600" />
               <div className="grid grid-cols-2 gap-4">
-                <select value={formData.level} onChange={e => setFormData({...formData, level: e.target.value as ProficiencyLevel})} className="p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold">
-                  {['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map(l => <option key={l} value={l}>{l}</option>)}
+                <select value={formData.level} onChange={e=>setFormData({...formData, level:e.target.value as any})} className="p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold">
+                  {['A1','A2','B1','B2','C1','C2'].map(l=><option key={l} value={l}>{l}</option>)}
                 </select>
-                <input value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} placeholder="PWD (DEFAULT 123456)" className="p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold" />
+                <input value={formData.password} onChange={e=>setFormData({...formData, password:e.target.value})} placeholder="SENHA (PADRÃO 123)" className="p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold" />
               </div>
-              <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="EMAIL ADDRESS" className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold" />
-              <input value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: e.target.value})} placeholder="WHATSAPP (+55...)" className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold" />
-              <button className="w-full py-6 bg-indigo-600 text-white rounded-[24px] font-black uppercase text-sm tracking-widest shadow-2xl shadow-indigo-100">Confirm Registration</button>
+              <input value={formData.email} onChange={e=>setFormData({...formData, email:e.target.value})} placeholder="EMAIL" className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold" />
+              <input value={formData.whatsapp} onChange={e=>setFormData({...formData, whatsapp:e.target.value})} placeholder="WHATSAPP" className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold" />
+              <button className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase">Confirmar Registro</button>
+              <button type="button" onClick={()=>setShowForm(null)} className="w-full text-slate-400 font-bold text-xs uppercase mt-2">Cancelar</button>
             </form>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {myStudents.map(student => (
-          <div key={student.id} className="bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all group flex flex-col relative overflow-hidden">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-16 h-16 bg-slate-900 text-white rounded-3xl flex items-center justify-center text-2xl font-black">
-                {student.username.substring(0, 2).toUpperCase()}
-              </div>
-              <div className="flex flex-col">
-                <h3 className="font-bold text-slate-900 text-xl leading-tight uppercase group-hover:text-indigo-600 transition-colors">{student.username}</h3>
-                <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Mastery: {student.level}</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mb-6">
-               <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100 text-center">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">XP Points</p>
-                  <p className="text-xl font-black text-slate-900">{student.xp}</p>
-               </div>
-               <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100 text-center">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Stay Duration</p>
-                  <p className="text-xl font-black text-indigo-600">{formatTime(student.totalSessionTime)}</p>
-               </div>
-            </div>
-
-            <div className="space-y-3 flex-1 mb-6">
-               <div className="flex items-center justify-between text-xs font-bold">
-                 <span className="text-slate-400 uppercase tracking-tighter">Last Login</span>
-                 <span className="text-slate-900">{student.lastLogin ? new Date(student.lastLogin).toLocaleString() : 'Never'}</span>
-               </div>
-               <div className="flex items-center justify-between text-xs font-bold">
-                 <span className="text-slate-400 uppercase tracking-tighter">Status</span>
-                 <span className="flex items-center gap-1.5 text-emerald-600">
-                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                    ACTIVE
-                 </span>
-               </div>
-            </div>
-
-            <div className="grid grid-cols-4 gap-1.5">
-               {Object.entries(student.skills).map(([skill, val]) => (
-                 <div key={skill} className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-indigo-500" style={{ width: `${val}%` }}></div>
-                 </div>
-               ))}
-            </div>
-            
-            <button className="mt-6 w-full py-4 bg-slate-100 group-hover:bg-indigo-600 group-hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">
-              View Detailed Portfolio
-            </button>
-          </div>
-        ))}
+      <div className="bg-white rounded-[40px] border border-slate-200 overflow-hidden shadow-sm">
+        <table className="w-full text-left whitespace-nowrap">
+          <thead className="bg-slate-50/50">
+            <tr>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Aluno</th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Atividade & Sessão</th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tracking & Insights (Top 5)</th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Gestão</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {myStudents.map(s => (
+              <tr key={s.id} className="hover:bg-slate-50/50 transition-colors group">
+                <td className="px-8 py-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-700 font-black uppercase">{s.username.charAt(0)}</div>
+                    <div className="flex flex-col">
+                      <span className="font-bold text-slate-900 uppercase leading-tight">{s.username}</span>
+                      <span className="text-[9px] text-indigo-500 font-black tracking-widest">LEVEL {s.level}</span>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-8 py-6">
+                  <div className="flex flex-col gap-0.5 text-[10px] font-bold text-slate-500">
+                    <span>ÚLTIMO LOGIN: {s.lastLogin ? new Date(s.lastLogin).toLocaleDateString() : 'NUNCA'}</span>
+                    <span>PERMANÊNCIA: <span className="text-indigo-600">{formatTime(s.totalSessionTime)}</span></span>
+                  </div>
+                </td>
+                <td className="px-8 py-6">
+                  <div className="flex flex-col gap-1">
+                    {generateFeedbackPoints(s).map((p, i) => (
+                      <div key={i} className="text-[9px] font-bold text-slate-600 flex items-center gap-1.5">
+                        <span className="w-1 h-1 bg-emerald-500 rounded-full"></span> {p}
+                      </div>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-8 py-6 text-right">
+                  <div className="flex justify-end gap-2">
+                    <button onClick={()=>{setEditingUser(s); setFormData({username:s.username,password:s.password||'',level:s.level,email:s.email||'',whatsapp:s.whatsapp||''}); setShowForm('edit');}} className="p-2 text-slate-400 hover:text-indigo-600 transition-all bg-white border border-slate-100 rounded-lg shadow-sm"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeWidth="2"/></svg></button>
+                    <button onClick={()=>resetPwd(s.id)} title="Reset Password" className="p-2 text-slate-400 hover:text-amber-600 transition-all bg-white border border-slate-100 rounded-lg shadow-sm"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2"/></svg></button>
+                    <button onClick={()=>deleteUser(s.id)} className="p-2 text-slate-400 hover:text-red-600 transition-all bg-white border border-slate-100 rounded-lg shadow-sm"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2"/></svg></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

@@ -19,11 +19,10 @@ export interface UserProgress {
   };
   teacherId?: string;
   lastLogin?: string;
-  lastLogout?: string;
-  totalSessionTime?: number; // in seconds
-  certificates: string[];
+  totalSessionTime?: number; // em segundos
   email?: string;
   whatsapp?: string;
+  certificates: string[];
 }
 
 export enum FeedbackType {
