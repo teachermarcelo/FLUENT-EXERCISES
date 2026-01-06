@@ -1,7 +1,12 @@
 
 export type ProficiencyLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+export type UserRole = 'admin' | 'teacher' | 'student';
 
 export interface UserProgress {
+  id: string;
+  username: string;
+  password?: string;
+  role: UserRole;
   level: ProficiencyLevel;
   xp: number;
   streak: number;
@@ -12,13 +17,16 @@ export interface UserProgress {
     reading: number;
     writing: number;
   };
+  teacherId?: string; // Para alunos: quem é o professor
+  lastLogin?: string;
+  certificates: string[]; // Níveis concluídos
 }
 
 export enum FeedbackType {
-  PERFECT = 'PERFECT',       // Green
-  IMPROVABLE = 'IMPROVABLE', // Blue
-  UNNATURAL = 'UNNATURAL',   // Orange
-  INCORRECT = 'INCORRECT'    // Red
+  PERFECT = 'PERFECT',
+  IMPROVABLE = 'IMPROVABLE',
+  UNNATURAL = 'UNNATURAL',
+  INCORRECT = 'INCORRECT'
 }
 
 export interface AIFeedback {
@@ -26,23 +34,5 @@ export interface AIFeedback {
   correction: string;
   explanation: string;
   naturalAlternative?: string;
-  score?: number; // Pontuação de 0 a 100 para pronúncia/escrita
-}
-
-export interface Exercise {
-  id: string;
-  type: 'multiple-choice' | 'dictation' | 'translation' | 'speaking' | 'free-writing';
-  question: string;
-  context?: string;
-  correctAnswer?: string;
-  options?: string[];
-  audioUrl?: string;
-}
-
-export interface Lesson {
-  id: string;
-  title: string;
-  category: 'Business' | 'Academic' | 'Travel' | 'Everyday' | 'Tech';
-  level: ProficiencyLevel;
-  exercises: Exercise[];
+  score?: number;
 }
