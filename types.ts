@@ -20,6 +20,8 @@ export interface UserProgress {
   teacherId?: string; // Para alunos: quem é o professor
   lastLogin?: string;
   certificates: string[]; // Níveis concluídos
+  email?: string;
+  whatsapp?: string;
 }
 
 export enum FeedbackType {

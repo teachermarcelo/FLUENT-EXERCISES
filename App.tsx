@@ -29,7 +29,38 @@ const initDB = () => {
       skills: { speaking: 100, listening: 100, reading: 100, writing: 100 },
       certificates: []
     };
-    localStorage.setItem('lingualeap_db', JSON.stringify([adminUser]));
+
+    const teacherMarcelo: UserProgress = {
+      id: 'teacher-marcelo',
+      username: 'teacher marcelo',
+      password: '123456',
+      role: 'teacher',
+      level: 'C2',
+      xp: 500,
+      streak: 10,
+      completedLessons: [],
+      skills: { speaking: 100, listening: 100, reading: 100, writing: 100 },
+      certificates: [],
+      email: 'teacher@gmail.com',
+      whatsapp: '41999653041'
+    };
+
+    const studentGestor: UserProgress = {
+      id: 'student-gestor',
+      username: 'gestor paid',
+      password: '123456',
+      role: 'student',
+      level: 'A1',
+      xp: 0,
+      streak: 0,
+      completedLessons: [],
+      skills: { speaking: 0, listening: 0, reading: 0, writing: 0 },
+      certificates: [],
+      email: 'gestorpaid@gmail.com',
+      whatsapp: '41999653041'
+    };
+
+    localStorage.setItem('lingualeap_db', JSON.stringify([adminUser, teacherMarcelo, studentGestor]));
   }
 };
 
