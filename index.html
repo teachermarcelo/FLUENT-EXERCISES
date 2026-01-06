@@ -12,17 +12,12 @@
     <style>
       body {
         font-family: 'Inter', sans-serif;
+        margin: 0;
+        padding: 0;
       }
       h1, h2, h3, .font-heading {
         font-family: 'Outfit', sans-serif;
       }
-      .glass-morphism {
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.18);
-      }
-      /* Animações globais para evitar telas estáticas */
       @keyframes fadeIn {
         from { opacity: 0; }
         to { opacity: 1; }
@@ -32,32 +27,36 @@
       }
     </style>
     
-    <!-- Shim para evitar erro de 'process is not defined' no GitHub Pages -->
     <script>
-      window.process = window.process || { env: { API_KEY: "" } };
+      // Garante que 'process.env' exista antes de qualquer módulo carregar
+      window.process = { 
+        env: { 
+          API_KEY: "" // Será injetado pelo ambiente se disponível
+        } 
+      };
     </script>
 
     <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@^19.2.3",
-        "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-        "react/": "https://esm.sh/react@^19.2.3/",
-        "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-        "react-router-dom": "https://esm.sh/react-router-dom@^7.11.0"
-      }
-    }
-    </script>
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "react-router-dom": "https://esm.sh/react-router-dom@7.1.0",
+    "@google/genai": "https://esm.sh/@google/genai@1.34.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/"
+  }
+}
+</script>
     
-    <!-- Chamada vital para o funcionamento do app -->
     <script type="module" src="./index.tsx"></script>
   </head>
   <body class="bg-slate-50 text-slate-900">
     <div id="root">
-      <!-- Loader simples para quando o JS ainda está carregando -->
       <div class="min-h-screen flex flex-col items-center justify-center space-y-4">
         <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-        <p class="text-slate-400 font-medium animate-pulse">Loading LinguaLeap...</p>
+        <p class="text-slate-400 font-medium animate-pulse">Initializing LinguaLeap...</p>
       </div>
     </div>
   </body>

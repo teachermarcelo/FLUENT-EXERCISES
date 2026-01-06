@@ -1,14 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import Sidebar from './components/Sidebar.tsx';
-import Dashboard from './components/Dashboard.tsx';
-import DiagnosticTest from './components/DiagnosticTest.tsx';
-import LessonPlayer from './components/LessonPlayer.tsx';
-import AIConversation from './components/AIConversation.tsx';
-import LevelSelector from './components/LevelSelector.tsx';
-import Modules from './components/Modules.tsx';
-import { UserProgress, ProficiencyLevel } from './types.ts';
+import Sidebar from './components/Sidebar';
+import Dashboard from './components/Dashboard';
+import DiagnosticTest from './components/DiagnosticTest';
+import LessonPlayer from './components/LessonPlayer';
+import AIConversation from './components/AIConversation';
+import LevelSelector from './components/LevelSelector';
+import Modules from './components/Modules';
+import { UserProgress, ProficiencyLevel } from './types';
 
 const INITIAL_PROGRESS: UserProgress = {
   level: 'A1',

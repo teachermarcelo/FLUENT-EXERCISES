@@ -1,8 +1,8 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { FeedbackType, AIFeedback } from "./types.ts";
+import { FeedbackType, AIFeedback } from "./types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: (process.env.API_KEY || "") });
 
 export async function analyzeAnswer(
   question: string,
