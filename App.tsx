@@ -3,89 +3,76 @@ import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
-import DiagnosticTest from './components/DiagnosticTest';
 import LessonPlayer from './components/LessonPlayer';
 import AIConversation from './components/AIConversation';
-import LevelSelector from './components/LevelSelector';
 import Modules from './components/Modules';
 import AdminTab from './components/AdminTab';
 import TeacherTab from './components/TeacherTab';
 import NotificationTab from './components/NotificationTab';
 import Login from './components/Login';
-import { UserProgress, ProficiencyLevel } from './types';
+import { UserProgress } from './types';
 
 const initDB = () => {
-  const dbStr = localStorage.getItem('lingualeap_db');
-  let db: UserProgress[] = dbStr ? JSON.parse(dbStr) : [];
-  
-  const hasAdmin = db.some(u => u.username.toLowerCase() === 'admin');
-  const hasMarcelo = db.some(u => u.username.toLowerCase() === 'teacher marcelo');
-  const hasGestor = db.some(u => u.username.toLowerCase() === 'gestor paid');
+  try {
+    const dbStr = localStorage.getItem('lingualeap_db');
+    let db: UserProgress[] = dbStr ? JSON.parse(dbStr) : [];
+    
+    const hasAdmin = db.some(u => u.username.toLowerCase() === 'admin');
+    const hasMarcelo = db.some(u => u.username.toLowerCase() === 'teacher marcelo');
 
-  let updated = false;
+    let updated = false;
 
-  if (!hasAdmin) {
-    db.push({
-      id: 'admin-0',
-      username: 'admin',
-      password: '123',
-      role: 'admin',
-      level: 'C2',
-      xp: 9999,
-      streak: 365,
-      completedLessons: [],
-      skills: { speaking: 100, listening: 100, reading: 100, writing: 100 },
-      certificates: []
-    });
-    updated = true;
-  }
+    if (!hasAdmin) {
+      db.push({
+        id: 'admin-0',
+        username: 'admin',
+        password: '123',
+        role: 'admin',
+        level: 'C2',
+        xp: 9999,
+        streak: 365,
+        completedLessons: [],
+        skills: { speaking: 100, listening: 100, reading: 100, writing: 100 },
+        certificates: []
+      });
+      updated = true;
+    }
 
-  if (!hasMarcelo) {
-    db.push({
-      id: 'teacher-marcelo',
-      username: 'teacher marcelo',
-      password: '123', // Senha simplificada para o prompt
-      role: 'teacher',
-      level: 'C2',
-      xp: 500,
-      streak: 10,
-      completedLessons: [],
-      skills: { speaking: 100, listening: 100, reading: 100, writing: 100 },
-      certificates: [],
-      email: 'teacher@gmail.com',
-      whatsapp: '41999653041'
-    });
-    updated = true;
-  }
+    if (!hasMarcelo) {
+      db.push({
+        id: 'teacher-marcelo',
+        username: 'teacher marcelo',
+        password: '123',
+        role: 'teacher',
+        level: 'C2',
+        xp: 500,
+        streak: 10,
+        completedLessons: [],
+        skills: { speaking: 100, listening: 100, reading: 100, writing: 100 },
+        certificates: [],
+        email: 'teacher@gmail.com',
+        whatsapp: '41999653041'
+      });
+      updated = true;
+    }
 
-  if (!hasGestor) {
-    db.push({
-      id: 'student-gestor',
-      username: 'gestor paid',
-      password: '123',
-      role: 'student',
-      level: 'A1',
-      xp: 120,
-      streak: 2,
-      teacherId: 'teacher-marcelo', // Vincula ao Marcelo por padrão
-      completedLessons: [],
-      skills: { speaking: 25, listening: 45, reading: 30, writing: 15 },
-      certificates: [],
-      email: 'gestorpaid@gmail.com',
-      whatsapp: '41999653041'
-    });
-    updated = true;
-  }
-
-  if (updated || !dbStr) {
-    localStorage.setItem('lingualeap_db', JSON.stringify(db));
+    if (updated || !dbStr) {
+      localStorage.setItem('lingualeap_db', JSON.stringify(db));
+    }
+  } catch (e) {
+    console.error("Critical error initializing database", e);
+    localStorage.removeItem('lingualeap_db'); // Reset if corrupted
   }
 };
 
 const AppContent: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<UserProgress | null>(() => {
-    const saved = localStorage.getItem('lingualeap_current_session');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('lingualeap_current_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
   });
 
   const navigate = useNavigate();
@@ -97,12 +84,6 @@ const AppContent: React.FC = () => {
   const handleLogin = (user: UserProgress) => {
     setCurrentUser(user);
     localStorage.setItem('lingualeap_current_session', JSON.stringify(user));
-    
-    const db = JSON.parse(localStorage.getItem('lingualeap_db') || '[]');
-    const updatedDb = db.map((u: UserProgress) => 
-      u.id === user.id ? { ...u, lastLogin: new Date().toISOString() } : u
-    );
-    localStorage.setItem('lingualeap_db', JSON.stringify(updatedDb));
     navigate('/dashboard');
   };
 
@@ -134,18 +115,13 @@ const AppContent: React.FC = () => {
             <Route path="/lesson/:id" element={<LessonPlayer user={currentUser} onUpdateProgress={syncUserProgress} />} />
             <Route path="/practice/chat" element={<AIConversation user={currentUser} />} />
             <Route path="/modules" element={<Modules user={currentUser} />} />
-            
-            {currentUser.role === 'admin' && (
-              <Route path="/admin" element={<AdminTab currentUser={currentUser} />} />
-            )}
-            
+            {currentUser.role === 'admin' && <Route path="/admin" element={<AdminTab currentUser={currentUser} />} />}
             {(currentUser.role === 'teacher' || currentUser.role === 'admin') && (
               <>
                 <Route path="/teacher" element={<TeacherTab currentUser={currentUser} />} />
                 <Route path="/notifications" element={<NotificationTab currentUser={currentUser} />} />
               </>
             )}
-
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>

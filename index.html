@@ -28,12 +28,9 @@
     </style>
     
     <script>
-      // Garante que 'process.env' exista antes de qualquer módulo carregar
-      window.process = { 
-        env: { 
-          API_KEY: "" // Será injetado pelo ambiente se disponível
-        } 
-      };
+      // Garante que 'process.env' exista de forma segura
+      if (!window.process) window.process = { env: {} };
+      if (!window.process.env) window.process.env = {};
     </script>
 
     <script type="importmap">
