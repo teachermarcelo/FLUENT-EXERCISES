@@ -1,16 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import Sidebar from './components/Sidebar';
-import Dashboard from './components/Dashboard';
-import LessonPlayer from './components/LessonPlayer';
-import AIConversation from './components/AIConversation';
-import Modules from './components/Modules';
-import AdminTab from './components/AdminTab';
-import TeacherTab from './components/TeacherTab';
-import NotificationTab from './components/NotificationTab';
-import Login from './components/Login';
-import { UserProgress } from './types';
+import Sidebar from './components/Sidebar.tsx';
+import Dashboard from './components/Dashboard.tsx';
+import LessonPlayer from './components/LessonPlayer.tsx';
+import AIConversation from './components/AIConversation.tsx';
+import Modules from './components/Modules.tsx';
+import AdminTab from './components/AdminTab.tsx';
+import TeacherTab from './components/TeacherTab.tsx';
+import NotificationTab from './components/NotificationTab.tsx';
+import Login from './components/Login.tsx';
+import { UserProgress } from './types.ts';
 
 const initDB = () => {
   try {
