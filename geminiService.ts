@@ -2,7 +2,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { FeedbackType, AIFeedback } from "./types";
 
-const ai = new GoogleGenAI({ apiKey: (process.env.API_KEY || "") });
+// Always use the direct process.env.API_KEY as per guidelines
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export async function analyzeAnswer(
   question: string,
@@ -139,7 +140,7 @@ export async function generateConversationResponse(
 
 export async function getDiagnosticResult(responses: { question: string, answer: string }[]): Promise<{ level: string, feedback: string, strengths: string[], areasToImprove: string[] }> {
   const prompt = `
-    Based on the following 15 answers to a Placement Test, determine the user's CEFR level (A1, A2, B1, B2, C1, or C2).
+    Based on the following 15 answers to a Placement Test, determine the user's CEFR level (A1, A2, B1, B2, <C1, or C2).
     Analyze their grammar, vocabulary range, and ability to handle complex topics.
     
     User Responses:

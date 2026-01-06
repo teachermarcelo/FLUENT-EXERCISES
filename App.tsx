@@ -44,7 +44,7 @@ const initDB = () => {
     db.push({
       id: 'teacher-marcelo',
       username: 'teacher marcelo',
-      password: '123456',
+      password: '123', // Senha simplificada para o prompt
       role: 'teacher',
       level: 'C2',
       xp: 500,
@@ -62,13 +62,14 @@ const initDB = () => {
     db.push({
       id: 'student-gestor',
       username: 'gestor paid',
-      password: '123456',
+      password: '123',
       role: 'student',
       level: 'A1',
-      xp: 0,
-      streak: 0,
+      xp: 120,
+      streak: 2,
+      teacherId: 'teacher-marcelo', // Vincula ao Marcelo por padrão
       completedLessons: [],
-      skills: { speaking: 0, listening: 0, reading: 0, writing: 0 },
+      skills: { speaking: 25, listening: 45, reading: 30, writing: 15 },
       certificates: [],
       email: 'gestorpaid@gmail.com',
       whatsapp: '41999653041'
