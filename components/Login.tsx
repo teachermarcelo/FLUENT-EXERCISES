@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserProgress } from '../types';
 
 interface LoginProps {
@@ -10,6 +10,20 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [hasKey, setHasKey] = useState(false);
+
+  useEffect(() => {
+    const checkKey = async () => {
+      const exists = await (window as any).aistudio.hasSelectedApiKey();
+      setHasKey(exists);
+    };
+    checkKey();
+  }, []);
+
+  const handleSelectKey = async () => {
+    await (window as any).aistudio.openSelectKey();
+    setHasKey(true);
+  };
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +57,23 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <p className="text-slate-400 mt-3 font-bold uppercase text-[10px] tracking-widest">Global Master Academy</p>
         </div>
 
-        <form onSubmit={handleLoginSubmit} className="space-y-4">
+        {!hasKey && (
+          <div className="bg-amber-50 border-2 border-amber-100 p-6 rounded-3xl space-y-4">
+            <p className="text-xs font-bold text-amber-800 text-center uppercase tracking-widest">Configuração Necessária</p>
+            <p className="text-[10px] text-amber-600 text-center font-medium leading-relaxed">Para habilitar o Professor IA (Gemini 3), você precisa selecionar sua chave de API do Google Cloud.</p>
+            <button 
+              onClick={handleSelectKey}
+              className="w-full py-4 bg-amber-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-amber-600 transition-all shadow-lg shadow-amber-100"
+            >
+              Configurar Chave de API
+            </button>
+            <p className="text-[8px] text-center text-amber-400">
+              <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="underline">Documentação de Faturamento</a>
+            </p>
+          </div>
+        )}
+
+        <form onSubmit={handleLoginSubmit} className={`space-y-4 ${!hasKey ? 'opacity-40 pointer-events-none' : ''}`}>
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Username / Email</label>
             <input 
