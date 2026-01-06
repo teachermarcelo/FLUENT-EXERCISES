@@ -1,8 +1,108 @@
-
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { UserProgress, FeedbackType, AIFeedback } from '../types.ts';
 import { analyzeAnswer, analyzePronunciation } from '../geminiService.ts';
+
+// --- NOVA ESTRUTURA DE DADOS PARA AS LIÇÕES ---
+
+interface Activity {
+  id: string;
+  type: 'writing' | 'speaking';
+  title: string;
+  question: string;
+  targetAnswer: string;
+}
+
+interface Lesson {
+  id: string;
+  title: string;
+  activities: Activity[];
+}
+
+// Lição A1: Greetings com 10 atividades
+const a1GreetingsLesson: Lesson = {
+  id: 'a1-greetings',
+  title: 'A1: Greetings & Introductions',
+  activities: [
+    {
+      id: 'greeting-1',
+      type: 'writing',
+      title: 'Morning Greeting',
+      question: 'How would you greet someone in the morning?',
+      targetAnswer: 'Good morning.',
+    },
+    {
+      id: 'greeting-2',
+      type: 'speaking',
+      title: 'Introduce Yourself',
+      question: "Repeat this phrase: 'My name is Alex.'",
+      targetAnswer: 'My name is Alex.',
+    },
+    {
+      id: 'greeting-3',
+      type: 'writing',
+      title: 'Ask How Someone Is',
+      question: 'How would you ask someone how they are feeling?',
+      targetAnswer: 'How are you?',
+    },
+    {
+      id: 'greeting-4',
+      type: 'speaking',
+      title: 'Respond to "How are you?"',
+      question: "Repeat this phrase: 'I'm fine, thank you. And you?'",
+      targetAnswer: "I'm fine, thank you. And you?",
+    },
+    {
+      id: 'greeting-5',
+      type: 'writing',
+      title: 'Afternoon Greeting',
+      question: 'How would you greet someone in the afternoon?',
+      targetAnswer: 'Good afternoon.',
+    },
+    {
+      id: 'greeting-6',
+      type: 'speaking',
+      title: 'Say Goodbye',
+      question: "Repeat this phrase: 'Goodbye! See you later.'",
+      targetAnswer: 'Goodbye! See you later.',
+    },
+    {
+      id: 'greeting-7',
+      type: 'writing',
+      title: 'Evening Greeting',
+      question: 'How would you greet someone in the evening?',
+      targetAnswer: 'Good evening.',
+    },
+    {
+      id: 'greeting-8',
+      type: 'speaking',
+      title: 'Nice to Meet You',
+      question: "Repeat this phrase: 'Nice to meet you.'",
+      targetAnswer: 'Nice to meet you.',
+    },
+    {
+      id: 'greeting-9',
+      type: 'writing',
+      title: 'Ask Where Someone Is From',
+      question: 'How would you ask someone where they are from?',
+      targetAnswer: 'Where are you from?',
+    },
+    {
+      id: 'greeting-10',
+      type: 'speaking',
+      title: 'Say Where You Are From',
+      question: "Repeat this phrase: 'I'm from Brazil.'",
+      targetAnswer: "I'm from Brazil.",
+    },
+  ],
+};
+
+// Mapa de todas as lições disponíveis
+const lessons: { [key: string]: Lesson } = {
+  'a1-greetings': a1GreetingsLesson,
+};
+
+// --- COMPONENTE ---
 
 interface LessonPlayerProps {
   user: UserProgress;
@@ -10,8 +110,11 @@ interface LessonPlayerProps {
 }
 
 const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) => {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  
+  // Estado para controlar a atividade atual
+  const [currentActivityIndex, setCurrentActivityIndex] = useState(0);
   const [answer, setAnswer] = useState('');
   const [feedback, setFeedback] = useState<AIFeedback | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -23,16 +126,39 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
 
-  const isSpeakingTask = id?.includes('speaking') || id === 'travel-2';
-  const lessonTitle = isSpeakingTask ? "Speaking Practice" : "Professional Greetings";
-  const question = isSpeakingTask ? "Repeat this phrase: 'I'd like to book a flight to London, please.'" : "How would you introduce yourself formally in a business meeting?";
-  const targetText = "I'd like to book a flight to London, please.";
+  // Encontra a lição e a atividade atual usando useMemo para performance
+  const lesson = useMemo(() => (id ? lessons[id] : null), [id]);
+  const currentActivity = useMemo(() => lesson?.activities[currentActivityIndex], [lesson, currentActivityIndex]);
+
+  // Redireciona se a lição não for encontrada
+  useEffect(() => {
+    if (!lesson) {
+      navigate('/dashboard');
+    }
+  }, [lesson, navigate]);
+
+  // Reseta o estado da resposta quando a atividade muda
+  useEffect(() => {
+    setAnswer('');
+    setFeedback(null);
+    setIsRecording(false);
+    setRecordingTime(0);
+  }, [currentActivityIndex]);
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
+
+  if (!lesson || !currentActivity) {
+    return <div>Loading...</div>; // Ou um componente de loading
+  }
+
+  const isSpeakingTask = currentActivity.type === 'speaking';
+  const xpPerActivity = 50;
+  const totalXp = lesson.activities.length * xpPerActivity;
+  const skillIncreasePerLesson = 10;
 
   const startRecording = async () => {
     try {
@@ -76,7 +202,8 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
       reader.readAsDataURL(blob);
       reader.onloadend = async () => {
         const base64Audio = (reader.result as string).split(',')[1];
-        const result = await analyzePronunciation(targetText, base64Audio, 'audio/webm');
+        // Usa a resposta alvo da ATIVIDADE ATUAL
+        const result = await analyzePronunciation(currentActivity.targetAnswer, base64Audio, 'audio/webm');
         setFeedback(result);
         setIsSubmitting(false);
       };
@@ -91,7 +218,8 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
 
     setIsSubmitting(true);
     try {
-      const result = await analyzeAnswer(question, answer);
+      // Usa a pergunta e resposta da ATIVIDADE ATUAL
+      const result = await analyzeAnswer(currentActivity.question, answer);
       setFeedback(result);
     } catch (e) {
       console.error(e);
@@ -104,17 +232,25 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
     const isPass = (feedback?.score ?? 100) > 60;
     
     if (isPass && (feedback?.type === FeedbackType.PERFECT || feedback?.type === FeedbackType.IMPROVABLE)) {
-      setIsComplete(true);
-      const updatedUser = {
-        ...user,
-        xp: user.xp + 50,
-        skills: { 
-          ...user.skills, 
-          [isSpeakingTask ? 'speaking' : 'writing']: Math.min(100, user.skills[isSpeakingTask ? 'speaking' : 'writing'] + 5) 
-        }
-      };
-      onUpdateProgress(updatedUser);
+      // Verifica se é a última atividade
+      if (currentActivityIndex < lesson.activities.length - 1) {
+        // Avança para a próxima atividade
+        setCurrentActivityIndex(prev => prev + 1);
+      } else {
+        // Finaliza a lição
+        setIsComplete(true);
+        const updatedUser = {
+          ...user,
+          xp: user.xp + totalXp,
+          skills: { 
+            ...user.skills, 
+            [isSpeakingTask ? 'speaking' : 'writing']: Math.min(100, user.skills[isSpeakingTask ? 'speaking' : 'writing'] + skillIncreasePerLesson) 
+          }
+        };
+        onUpdateProgress(updatedUser);
+      }
     } else {
+      // Se falhou, limpa o feedback para tentar novamente
       setFeedback(null);
       setAnswer('');
     }
@@ -135,8 +271,9 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
         <div className="w-32 h-32 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 mb-8 scale-110 animate-pulse">
            <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
         </div>
-        <h2 className="text-4xl font-bold font-heading mb-4">Mastery Achieved!</h2>
-        <p className="text-slate-500 mb-8">You earned 50 XP and improved your skills.</p>
+        <h2 className="text-4xl font-bold font-heading mb-4">Lesson Complete!</h2>
+        <p className="text-slate-500 mb-2">You've mastered the "{lesson.title}" lesson.</p>
+        <p className="text-slate-500 mb-8">You earned {totalXp} XP and improved your skills.</p>
         <button
           onClick={() => navigate('/dashboard')}
           className="px-12 py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200"
@@ -156,14 +293,19 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
         <div>
           <button onClick={() => navigate('/dashboard')} className="text-slate-400 hover:text-slate-600 mb-2 flex items-center gap-1 text-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-            Cancel Session
+            Cancel Lesson
           </button>
-          <h2 className="text-2xl font-bold font-heading">{lessonTitle}</h2>
+          <h2 className="text-2xl font-bold font-heading">{lesson.title}</h2>
         </div>
         <div className="text-right">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Exercise 1/5</p>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+            Activity {currentActivityIndex + 1}/{lesson.activities.length}
+          </p>
           <div className="w-32 h-2 bg-slate-100 rounded-full mt-2 overflow-hidden">
-            <div className="w-1/5 h-full bg-indigo-600" />
+            <div 
+              className="h-full bg-indigo-600 transition-all duration-500 ease-out" 
+              style={{ width: `${((currentActivityIndex + 1) / lesson.activities.length) * 100}%` }}
+            />
           </div>
         </div>
       </header>
@@ -173,7 +315,7 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
           <p className="text-xs font-bold text-indigo-600 mb-2 uppercase tracking-wide">
             {isSpeakingTask ? 'Speaking Mission' : 'Writing Mission'}
           </p>
-          <h3 className="text-xl font-semibold text-slate-900 mb-4">{question}</h3>
+          <h3 className="text-xl font-semibold text-slate-900 mb-4">{currentActivity.question}</h3>
         </div>
 
         <div className="space-y-4">
@@ -251,7 +393,7 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
                   !isFailedScore ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200' : 'bg-slate-800 hover:bg-slate-900'
                 }`}
               >
-                {!isFailedScore ? 'Continue' : 'Try Again'}
+                {!isFailedScore ? (currentActivityIndex < lesson.activities.length - 1 ? 'Next Activity' : 'Finish Lesson') : 'Try Again'}
               </button>
             </div>
           )}
