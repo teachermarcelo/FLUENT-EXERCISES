@@ -2,63 +2,56 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { UserProgress, FeedbackType, AIFeedback } from "./types";
 
-// Inicialização única seguindo as regras da SDK
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
- * AI Immersion - Conversação Inteligente
+ * AI Immersion Chat - Conversação Fluida
  */
 export async function generateImmersiveResponse(history: any[], topic: string, level: string): Promise<string> {
   const ai = getAI();
   
-  // Mapeamento correto do histórico para a SDK
-  const formattedHistory = history.map(msg => ({
+  // Converte o histórico para o formato estrito da SDK Gemini 3
+  const formattedContents = history.map(msg => ({
     role: msg.role === 'user' ? 'user' : 'model',
     parts: [{ text: msg.parts[0].text }]
   }));
 
   const systemInstruction = `You are a world-class English Coach for the platform FLUENT IMMERSION. 
-  Topic: ${topic}. Student Level: ${level}. 
-  CRITICAL RULE: Correct the student using the sandwich method (Praise -> Subtle correction with *asterisks* -> Follow-up question). 
-  Keep the conversation natural, immersive, and encouraging. Never break character.`;
+  Current Topic: ${topic}. Student Proficiency Level: ${level}. 
+  METHOD: Correct the student subtly using asterisks *like this* and provide a motivating follow-up question. 
+  Stay in character as a supportive mentor.`;
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: formattedHistory,
+      contents: formattedContents,
       config: { 
         systemInstruction, 
         temperature: 0.8,
         topP: 0.95 
       }
     });
-    // Uso da propriedade .text diretamente conforme diretriz
-    return response.text || "I'm listening, please continue!";
+    return response.text || "I'm processing your thoughts. Can you say that again?";
   } catch (e) {
-    console.error("Gemini Error:", e);
-    return "The immersion lab is currently recalibrating. Please send your message again in a few seconds.";
+    console.error("AI Error:", e);
+    return "The Immersion Lab is reconnecting. Please try sending your message again.";
   }
 }
 
 /**
- * Relatório Pedagógico - 5 Pontos de Melhoria
+ * Relatório Pedagógico - 5 Dicas de Ouro
  */
 export async function generatePedagogicalReport(student: UserProgress): Promise<string[]> {
   const ai = getAI();
-  const prompt = `Analyze this student performance data and provide EXACTLY 5 high-impact pedagogical tips for their English improvement.
+  const prompt = `Analyze this student data and provide 5 HIGH-LEVEL pedagogical tips in Portuguese (PT-BR) for improvement.
   Level: ${student.level}
   XP: ${student.xp}
-  Speaking Skill: ${student.skills.speaking}%
-  Listening Skill: ${student.skills.listening}%
-  Writing Skill: ${student.skills.writing}%
-  Reading Skill: ${student.skills.reading}%
+  Speaking: ${student.skills.speaking}%
+  Listening: ${student.skills.listening}%
+  Writing: ${student.skills.writing}%
+  Reading: ${student.skills.reading}%
   
-  Guidelines:
-  1. Be professional and encouraging.
-  2. Focus on the lowest skill scores.
-  3. Suggest practical daily exercises.
-  
-  OUTPUT FORMAT: A JSON array of 5 strings in Portuguese (PT-BR).`;
+  Format the output as a clean JSON array of 5 strings. Each tip should be actionable.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -75,95 +68,83 @@ export async function generatePedagogicalReport(student: UserProgress): Promise<
     return JSON.parse(response.text || "[]");
   } catch (e) {
     return [
-      "Pratique 15 minutos de conversação diária para elevar seu speaking.",
-      "Ouça podcasts no nível " + student.level + " durante o trajeto para o trabalho.",
-      "Tente escrever um pequeno diário em inglês sobre seu dia.",
-      "Revise as estruturas gramaticais do módulo atual.",
-      "Utilize o AI Immersion Lab para testar vocabulário novo em contextos reais."
+      "Pratique conversação por 10 minutos extras no Lab.",
+      "Assista vídeos curtos sem legenda para treinar o Listening.",
+      "Tente escrever um parágrafo sobre seu dia no Lab de Writing.",
+      "Revise vocabulário de viagens para aumentar sua confiança.",
+      "Participe de sessões focadas em gramática para polir sua escrita."
     ];
   }
 }
 
-export async function getDiagnosticResult(responses: { question: string, answer: string }[]): Promise<any> {
+// Funções de utilidade para o LessonPlayer e Teste Diagnóstico
+export async function getDiagnosticResult(responses: any[]) {
   const ai = getAI();
-  const prompt = `Evaluate the following test: ${JSON.stringify(responses)}. Determine CEFR level.`;
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            level: { type: Type.STRING },
-            feedback: { type: Type.STRING },
-            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-            areasToImprove: { type: Type.ARRAY, items: { type: Type.STRING } }
-          },
-          required: ["level", "feedback", "strengths", "areasToImprove"]
-        }
+  const response = await ai.models.generateContent({
+    model: "gemini-3-pro-preview",
+    contents: [{ role: 'user', parts: [{ text: `Evaluate CEFR level: ${JSON.stringify(responses)}` }] }],
+    config: { 
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          level: { type: Type.STRING },
+          feedback: { type: Type.STRING },
+          strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+          areasToImprove: { type: Type.ARRAY, items: { type: Type.STRING } }
+        },
+        required: ["level", "feedback", "strengths", "areasToImprove"]
       }
-    });
-    return JSON.parse(response.text || "{}");
-  } catch (e) { throw e; }
+    }
+  });
+  return JSON.parse(response.text || "{}");
 }
 
 export async function analyzeAnswer(question: string, answer: string): Promise<AIFeedback> {
   const ai = getAI();
-  const prompt = `Evaluate: Q: ${question} A: ${answer}`;
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            type: { type: Type.STRING },
-            correction: { type: Type.STRING },
-            explanation: { type: Type.STRING },
-            naturalAlternative: { type: Type.STRING },
-            score: { type: Type.NUMBER }
-          },
-          required: ["type", "correction", "explanation", "score"]
-        }
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: [{ role: 'user', parts: [{ text: `Q: ${question} A: ${answer}` }] }],
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          type: { type: Type.STRING },
+          correction: { type: Type.STRING },
+          explanation: { type: Type.STRING },
+          score: { type: Type.NUMBER }
+        },
+        required: ["type", "correction", "explanation", "score"]
       }
-    });
-    return JSON.parse(response.text || "{}");
-  } catch (e) {
-    return { type: FeedbackType.INCORRECT, correction: "Error", explanation: "System busy.", score: 0 };
-  }
+    }
+  });
+  return JSON.parse(response.text || "{}");
 }
 
-export async function analyzePronunciation(targetText: string, base64Audio: string, mimeType: string): Promise<AIFeedback> {
+export async function analyzePronunciation(target: string, audio: string, mime: string): Promise<AIFeedback> {
   const ai = getAI();
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: {
-        parts: [
-          { text: `Evaluate pronunciation of: "${targetText}"` },
-          { inlineData: { data: base64Audio, mimeType: mimeType } }
-        ]
-      },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            type: { type: Type.STRING },
-            correction: { type: Type.STRING },
-            explanation: { type: Type.STRING },
-            score: { type: Type.NUMBER }
-          },
-          required: ["type", "correction", "explanation", "score"]
-        }
+  const response = await ai.models.generateContent({
+    model: "gemini-3-pro-preview",
+    contents: {
+      parts: [
+        { text: `Evaluate pronunciation of: ${target}` },
+        { inlineData: { data: audio, mimeType: mime } }
+      ]
+    },
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          type: { type: Type.STRING },
+          correction: { type: Type.STRING },
+          explanation: { type: Type.STRING },
+          score: { type: Type.NUMBER }
+        },
+        required: ["type", "correction", "explanation", "score"]
       }
-    });
-    return JSON.parse(response.text || "{}");
-  } catch (e) {
-    return { type: FeedbackType.INCORRECT, correction: "Audio error", explanation: "Process failed.", score: 0 };
-  }
+    }
+  });
+  return JSON.parse(response.text || "{}");
 }

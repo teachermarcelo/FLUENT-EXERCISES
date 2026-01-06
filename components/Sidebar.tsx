@@ -29,23 +29,23 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   return (
     <>
       {/* Mobile Top Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-50 flex items-center justify-between px-6">
+      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-50 flex items-center justify-between px-6 shadow-sm">
         <Link to="/dashboard" className="text-xl font-black text-indigo-600 tracking-tighter uppercase">Fluent</Link>
-        <button onClick={() => setIsOpen(!isOpen)} className="p-2 text-slate-900">
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <button onClick={() => setIsOpen(!isOpen)} className="p-2 text-slate-900 bg-slate-50 rounded-xl active:scale-90 transition-all">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d={isOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
           </svg>
         </button>
       </div>
 
-      <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-200 flex flex-col transform transition-transform duration-300 md:relative md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-200 flex flex-col transform transition-transform duration-300 md:relative md:translate-x-0 ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
         <div className="p-8 hidden md:block">
           <Link to="/dashboard" className="text-2xl font-black text-indigo-600 font-heading tracking-tighter uppercase leading-none">
             Fluent<br/><span className="text-slate-900">Immersion</span>
           </Link>
         </div>
 
-        <nav className="flex-1 px-6 space-y-1 mt-20 md:mt-4">
+        <nav className="flex-1 px-6 space-y-2 mt-20 md:mt-4">
           {navItems.map((item) => (
             <Link
               key={item.path}
@@ -57,7 +57,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
                   : 'text-slate-500 hover:bg-slate-50'
               }`}
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d={item.icon} />
               </svg>
               {item.name}
@@ -67,13 +67,15 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
 
         <div className="p-6 border-t border-slate-50">
           <div className="bg-slate-50 rounded-2xl p-4 flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-700 font-black">{user.level}</div>
+            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-700 font-black uppercase shadow-inner">
+              {user.level}
+            </div>
             <div className="overflow-hidden">
               <p className="text-xs font-black text-slate-900 truncate uppercase">{user.username}</p>
-              <p className="text-[10px] text-indigo-500 font-bold uppercase">{user.role}</p>
+              <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-widest">{user.role}</p>
             </div>
           </div>
-          <button onClick={onLogout} className="w-full py-4 text-xs font-black text-red-500 hover:bg-red-50 rounded-2xl transition-all flex items-center justify-center gap-2 uppercase tracking-widest">
+          <button onClick={onLogout} className="w-full py-4 text-xs font-black text-red-500 hover:bg-red-50 rounded-2xl transition-all flex items-center justify-center gap-2 uppercase tracking-widest border border-transparent hover:border-red-100">
             Sair da Conta
           </button>
         </div>
