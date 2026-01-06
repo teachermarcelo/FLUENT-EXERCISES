@@ -14,7 +14,6 @@ import NotificationTab from './components/NotificationTab';
 import Login from './components/Login';
 import { UserProgress, ProficiencyLevel } from './types';
 
-// Mock DB Initializer
 const initDB = () => {
   const dbStr = localStorage.getItem('lingualeap_db');
   let db: UserProgress[] = dbStr ? JSON.parse(dbStr) : [];
@@ -98,13 +97,11 @@ const AppContent: React.FC = () => {
     setCurrentUser(user);
     localStorage.setItem('lingualeap_current_session', JSON.stringify(user));
     
-    // Atualizar último login no "DB"
     const db = JSON.parse(localStorage.getItem('lingualeap_db') || '[]');
     const updatedDb = db.map((u: UserProgress) => 
       u.id === user.id ? { ...u, lastLogin: new Date().toISOString() } : u
     );
     localStorage.setItem('lingualeap_db', JSON.stringify(updatedDb));
-    
     navigate('/dashboard');
   };
 
@@ -117,7 +114,6 @@ const AppContent: React.FC = () => {
   const syncUserProgress = (updatedUser: UserProgress) => {
     setCurrentUser(updatedUser);
     localStorage.setItem('lingualeap_current_session', JSON.stringify(updatedUser));
-    
     const db = JSON.parse(localStorage.getItem('lingualeap_db') || '[]');
     const updatedDb = db.map((u: UserProgress) => u.id === updatedUser.id ? updatedUser : u);
     localStorage.setItem('lingualeap_db', JSON.stringify(updatedDb));
@@ -138,19 +134,15 @@ const AppContent: React.FC = () => {
             <Route path="/practice/chat" element={<AIConversation user={currentUser} />} />
             <Route path="/modules" element={<Modules user={currentUser} />} />
             
-            {/* Rota Admin */}
             {currentUser.role === 'admin' && (
               <Route path="/admin" element={<AdminTab currentUser={currentUser} />} />
             )}
             
-            {/* Rota Teacher */}
             {(currentUser.role === 'teacher' || currentUser.role === 'admin') && (
-              <Route path="/teacher" element={<TeacherTab currentUser={currentUser} />} />
-            )}
-
-            {/* Rota Notificações */}
-            {(currentUser.role === 'teacher' || currentUser.role === 'admin') && (
-              <Route path="/notifications" element={<NotificationTab currentUser={currentUser} />} />
+              <>
+                <Route path="/teacher" element={<TeacherTab currentUser={currentUser} />} />
+                <Route path="/notifications" element={<NotificationTab currentUser={currentUser} />} />
+              </>
             )}
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
