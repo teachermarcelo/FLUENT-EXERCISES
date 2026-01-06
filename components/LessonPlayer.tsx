@@ -1,108 +1,9 @@
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { UserProgress, FeedbackType, AIFeedback } from '../types.ts';
+import { UserProgress, FeedbackType, AIFeedback, TaskType, LessonTask } from '../types.ts';
 import { analyzeAnswer, analyzePronunciation } from '../geminiService.ts';
-
-// --- NOVA ESTRUTURA DE DADOS PARA AS LIÇÕES ---
-
-interface Activity {
-  id: string;
-  type: 'writing' | 'speaking';
-  title: string;
-  question: string;
-  targetAnswer: string;
-}
-
-interface Lesson {
-  id: string;
-  title: string;
-  activities: Activity[];
-}
-
-// Lição A1: Greetings com 10 atividades
-const a1GreetingsLesson: Lesson = {
-  id: 'a1-greetings',
-  title: 'A1: Greetings & Introductions',
-  activities: [
-    {
-      id: 'greeting-1',
-      type: 'writing',
-      title: 'Morning Greeting',
-      question: 'How would you greet someone in the morning?',
-      targetAnswer: 'Good morning.',
-    },
-    {
-      id: 'greeting-2',
-      type: 'speaking',
-      title: 'Introduce Yourself',
-      question: "Repeat this phrase: 'My name is Alex.'",
-      targetAnswer: 'My name is Alex.',
-    },
-    {
-      id: 'greeting-3',
-      type: 'writing',
-      title: 'Ask How Someone Is',
-      question: 'How would you ask someone how they are feeling?',
-      targetAnswer: 'How are you?',
-    },
-    {
-      id: 'greeting-4',
-      type: 'speaking',
-      title: 'Respond to "How are you?"',
-      question: "Repeat this phrase: 'I'm fine, thank you. And you?'",
-      targetAnswer: "I'm fine, thank you. And you?",
-    },
-    {
-      id: 'greeting-5',
-      type: 'writing',
-      title: 'Afternoon Greeting',
-      question: 'How would you greet someone in the afternoon?',
-      targetAnswer: 'Good afternoon.',
-    },
-    {
-      id: 'greeting-6',
-      type: 'speaking',
-      title: 'Say Goodbye',
-      question: "Repeat this phrase: 'Goodbye! See you later.'",
-      targetAnswer: 'Goodbye! See you later.',
-    },
-    {
-      id: 'greeting-7',
-      type: 'writing',
-      title: 'Evening Greeting',
-      question: 'How would you greet someone in the evening?',
-      targetAnswer: 'Good evening.',
-    },
-    {
-      id: 'greeting-8',
-      type: 'speaking',
-      title: 'Nice to Meet You',
-      question: "Repeat this phrase: 'Nice to meet you.'",
-      targetAnswer: 'Nice to meet you.',
-    },
-    {
-      id: 'greeting-9',
-      type: 'writing',
-      title: 'Ask Where Someone Is From',
-      question: 'How would you ask someone where they are from?',
-      targetAnswer: 'Where are you from?',
-    },
-    {
-      id: 'greeting-10',
-      type: 'speaking',
-      title: 'Say Where You Are From',
-      question: "Repeat this phrase: 'I'm from Brazil.'",
-      targetAnswer: "I'm from Brazil.",
-    },
-  ],
-};
-
-// Mapa de todas as lições disponíveis
-const lessons: { [key: string]: Lesson } = {
-  'a1-greetings': a1GreetingsLesson,
-};
-
-// --- COMPONENTE ---
+import { LESSON_DATA } from '../data/lessons.ts';
 
 interface LessonPlayerProps {
   user: UserProgress;
@@ -113,12 +14,13 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   
-  // Estado para controlar a atividade atual
-  const [currentActivityIndex, setCurrentActivityIndex] = useState(0);
+  const lessonTasks = useMemo(() => (id ? LESSON_DATA[id] || [] : []), [id]);
+  const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [answer, setAnswer] = useState('');
   const [feedback, setFeedback] = useState<AIFeedback | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [totalXpEarned, setTotalXpEarned] = useState(0);
 
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -126,24 +28,20 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
 
-  // Encontra a lição e a atividade atual usando useMemo para performance
-  const lesson = useMemo(() => (id ? lessons[id] : null), [id]);
-  const currentActivity = useMemo(() => lesson?.activities[currentActivityIndex], [lesson, currentActivityIndex]);
+  const currentTask = useMemo(() => lessonTasks[currentTaskIndex], [lessonTasks, currentTaskIndex]);
 
-  // Redireciona se a lição não for encontrada
   useEffect(() => {
-    if (!lesson) {
+    if (id && !LESSON_DATA[id]) {
       navigate('/dashboard');
     }
-  }, [lesson, navigate]);
+  }, [id, navigate]);
 
-  // Reseta o estado da resposta quando a atividade muda
   useEffect(() => {
     setAnswer('');
     setFeedback(null);
     setIsRecording(false);
     setRecordingTime(0);
-  }, [currentActivityIndex]);
+  }, [currentTaskIndex]);
 
   useEffect(() => {
     return () => {
@@ -151,14 +49,7 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
     };
   }, []);
 
-  if (!lesson || !currentActivity) {
-    return <div>Loading...</div>; // Ou um componente de loading
-  }
-
-  const isSpeakingTask = currentActivity.type === 'speaking';
-  const xpPerActivity = 50;
-  const totalXp = lesson.activities.length * xpPerActivity;
-  const skillIncreasePerLesson = 10;
+  if (!currentTask) return <div className="p-20 text-center font-black uppercase tracking-widest text-slate-400">Loading Task...</div>;
 
   const startRecording = async () => {
     try {
@@ -202,8 +93,7 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
       reader.readAsDataURL(blob);
       reader.onloadend = async () => {
         const base64Audio = (reader.result as string).split(',')[1];
-        // Usa a resposta alvo da ATIVIDADE ATUAL
-        const result = await analyzePronunciation(currentActivity.targetAnswer, base64Audio, 'audio/webm');
+        const result = await analyzePronunciation(currentTask.targetText || '', base64Audio, 'audio/webm');
         setFeedback(result);
         setIsSubmitting(false);
       };
@@ -214,12 +104,11 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
   };
 
   const handleSubmit = async () => {
-    if (!answer.trim() || isSubmitting) return;
+    if ((!answer.trim() && currentTask.type !== TaskType.READING) || isSubmitting) return;
 
     setIsSubmitting(true);
     try {
-      // Usa a pergunta e resposta da ATIVIDADE ATUAL
-      const result = await analyzeAnswer(currentActivity.question, answer);
+      const result = await analyzeAnswer(currentTask.question, answer);
       setFeedback(result);
     } catch (e) {
       console.error(e);
@@ -231,29 +120,34 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
   const handleNext = () => {
     const isPass = (feedback?.score ?? 100) > 60;
     
-    if (isPass && (feedback?.type === FeedbackType.PERFECT || feedback?.type === FeedbackType.IMPROVABLE)) {
-      // Verifica se é a última atividade
-      if (currentActivityIndex < lesson.activities.length - 1) {
-        // Avança para a próxima atividade
-        setCurrentActivityIndex(prev => prev + 1);
+    if (isPass) {
+      setTotalXpEarned(prev => prev + (currentTask.xpReward || 0));
+      
+      if (currentTaskIndex < lessonTasks.length - 1) {
+        setCurrentTaskIndex(prev => prev + 1);
       } else {
-        // Finaliza a lição
-        setIsComplete(true);
-        const updatedUser = {
-          ...user,
-          xp: user.xp + totalXp,
-          skills: { 
-            ...user.skills, 
-            [isSpeakingTask ? 'speaking' : 'writing']: Math.min(100, user.skills[isSpeakingTask ? 'speaking' : 'writing'] + skillIncreasePerLesson) 
-          }
-        };
-        onUpdateProgress(updatedUser);
+        finishLesson();
       }
     } else {
-      // Se falhou, limpa o feedback para tentar novamente
       setFeedback(null);
       setAnswer('');
     }
+  };
+
+  const finishLesson = () => {
+    setIsComplete(true);
+    const finalXp = totalXpEarned + (currentTask.xpReward || 0);
+    const updatedUser = {
+      ...user,
+      xp: user.xp + finalXp,
+      completedLessons: Array.from(new Set([...user.completedLessons, id || ''])),
+      skills: { ...user.skills }
+    };
+    
+    const skillToUpdate = currentTask.skillImpact;
+    updatedUser.skills[skillToUpdate] = Math.min(100, updatedUser.skills[skillToUpdate] + 5);
+    
+    onUpdateProgress(updatedUser);
   };
 
   const getFeedbackStyles = (type: FeedbackType) => {
@@ -267,18 +161,18 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
 
   if (isComplete) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 animate-fadeIn">
-        <div className="w-32 h-32 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 mb-8 scale-110 animate-pulse">
-           <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+      <div className="flex flex-col items-center justify-center py-20 animate-fadeIn text-center px-6">
+        <div className="w-40 h-40 bg-indigo-600 rounded-[48px] flex items-center justify-center text-white mb-10 shadow-2xl shadow-indigo-100 rotate-3">
+           <svg className="w-20 h-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
         </div>
-        <h2 className="text-4xl font-bold font-heading mb-4">Lesson Complete!</h2>
-        <p className="text-slate-500 mb-2">You've mastered the "{lesson.title}" lesson.</p>
-        <p className="text-slate-500 mb-8">You earned {totalXp} XP and improved your skills.</p>
+        <h2 className="text-5xl font-black font-heading mb-4 tracking-tighter text-slate-900 uppercase">Mastery Achieved!</h2>
+        <p className="text-slate-500 mb-10 font-bold text-xl leading-relaxed">You mastered <span className="text-indigo-600">{lessonTasks.length} tasks</span> of the A1 Greetings module.</p>
+        <p className="text-slate-500 mb-12 font-bold text-xl">Total XP Gained: <span className="text-indigo-600">+{totalXpEarned}</span></p>
         <button
           onClick={() => navigate('/dashboard')}
-          className="px-12 py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200"
+          className="px-16 py-6 bg-slate-900 text-white rounded-[32px] font-black uppercase text-sm tracking-widest hover:bg-slate-800 transition-all shadow-2xl active:scale-95"
         >
-          Back to Dashboard
+          Return to Dashboard
         </button>
       </div>
     );
@@ -288,112 +182,175 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
   const isFailedScore = feedback?.score !== undefined && feedback.score <= 60;
 
   return (
-    <div className="max-w-3xl mx-auto py-4 space-y-8 animate-fadeIn">
-      <header className="flex items-center justify-between border-b border-slate-200 pb-6">
-        <div>
-          <button onClick={() => navigate('/dashboard')} className="text-slate-400 hover:text-slate-600 mb-2 flex items-center gap-1 text-sm">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-            Cancel Lesson
+    <div className="max-w-4xl mx-auto py-8 px-4 space-y-10 animate-fadeIn">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-[40px] border border-slate-200 shadow-sm">
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate('/dashboard')} className="p-3 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-white hover:border-indigo-600 transition-all text-slate-400 hover:text-indigo-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" /></svg>
           </button>
-          <h2 className="text-2xl font-bold font-heading">{lesson.title}</h2>
+          <div>
+            <h2 className="text-xl font-black font-heading text-slate-900 uppercase tracking-tighter">A1: Greetings & Introductions</h2>
+            <div className="flex items-center gap-2 mt-1">
+               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Task {currentTaskIndex + 1} of {lessonTasks.length}</span>
+            </div>
+          </div>
         </div>
-        <div className="text-right">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-            Activity {currentActivityIndex + 1}/{lesson.activities.length}
-          </p>
-          <div className="w-32 h-2 bg-slate-100 rounded-full mt-2 overflow-hidden">
-            <div 
-              className="h-full bg-indigo-600 transition-all duration-500 ease-out" 
-              style={{ width: `${((currentActivityIndex + 1) / lesson.activities.length) * 100}%` }}
-            />
+        
+        <div className="w-full md:w-64">
+          <div className="flex justify-between items-center mb-2">
+             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mastery Level</span>
+             <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{Math.round(((currentTaskIndex + 1) / lessonTasks.length) * 100)}%</span>
+          </div>
+          <div className="h-3 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+            <div className="h-full bg-indigo-600 transition-all duration-700" style={{ width: `${((currentTaskIndex + 1) / lessonTasks.length) * 100}%` }} />
           </div>
         </div>
       </header>
 
-      <div className="space-y-6">
-        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-          <p className="text-xs font-bold text-indigo-600 mb-2 uppercase tracking-wide">
-            {isSpeakingTask ? 'Speaking Mission' : 'Writing Mission'}
-          </p>
-          <h3 className="text-xl font-semibold text-slate-900 mb-4">{currentActivity.question}</h3>
-        </div>
+      <div className="grid grid-cols-1 gap-8">
+        <div className="bg-white p-10 md:p-14 rounded-[48px] border border-slate-200 shadow-xl shadow-slate-100 relative overflow-hidden">
+           <div className="absolute top-0 right-0 p-10">
+              <span className={`px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest ${
+                currentTask.type === TaskType.SPEAKING ? 'bg-rose-100 text-rose-600' :
+                currentTask.type === TaskType.WRITING ? 'bg-indigo-100 text-indigo-600' :
+                currentTask.type === TaskType.LISTENING ? 'bg-amber-100 text-amber-600' :
+                'bg-emerald-100 text-emerald-600'
+              }`}>
+                {currentTask.type} Mission
+              </span>
+           </div>
 
-        <div className="space-y-4">
-          {!isSpeakingTask ? (
-            <textarea
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              disabled={!!feedback || isSubmitting}
-              placeholder="Type your response here..."
-              className="w-full h-40 p-6 bg-white border-2 border-slate-200 rounded-3xl focus:border-indigo-600 outline-none text-lg transition-all shadow-sm"
-            />
-          ) : (
-            <div className="flex flex-col items-center py-12 bg-white rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
-               {isRecording && (
-                 <div className="absolute inset-0 bg-red-50/50 flex items-center justify-center animate-pulse">
-                    <div className="flex gap-2">
-                       {[1,2,3,4,5].map(i => <div key={i} className="w-1 bg-red-400 rounded-full animate-grow" style={{ animationDelay: `${i*0.1}s`, height: '20px' }}></div>)}
-                    </div>
-                 </div>
-               )}
-               
-               <p className="text-slate-400 font-bold mb-6">{isRecording ? `Recording... ${recordingTime}s` : 'Ready to speak?'}</p>
-               
-               {!feedback && !isSubmitting && (
-                 <button
-                   onMouseDown={startRecording}
-                   onMouseUp={stopRecording}
-                   className={`w-24 h-24 rounded-full flex items-center justify-center transition-all shadow-xl ${
-                     isRecording ? 'bg-red-500 scale-110 shadow-red-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'
-                   }`}
-                 >
-                   {isRecording ? (
-                     <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
-                   ) : (
-                     <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+           <div className="max-w-2xl mb-12">
+              <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest mb-4">Instructions</p>
+              <h3 className="text-3xl font-bold text-slate-900 leading-tight">{currentTask.question}</h3>
+              
+              {currentTask.type === TaskType.LISTENING && !feedback && (
+                <button 
+                  onClick={() => {
+                    const utterance = new SpeechSynthesisUtterance(currentTask.audioText || '');
+                    utterance.lang = 'en-US';
+                    window.speechSynthesis.speak(utterance);
+                  }}
+                  className="mt-8 p-6 bg-amber-50 text-amber-600 rounded-[32px] border-2 border-amber-100 flex items-center gap-4 hover:bg-amber-100 transition-all group active:scale-95"
+                >
+                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+                  </div>
+                  <span className="font-black uppercase text-xs tracking-widest">Listen to Audio</span>
+                </button>
+              )}
+           </div>
+
+           <div className="space-y-6">
+              {currentTask.type === TaskType.READING ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {currentTask.options?.map((opt) => (
+                    <button
+                      key={opt}
+                      disabled={!!feedback}
+                      onClick={() => { setAnswer(opt); }}
+                      className={`p-6 rounded-[32px] border-2 font-bold text-lg text-left transition-all ${
+                        answer === opt 
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-700' 
+                          : 'border-slate-100 hover:border-slate-200 text-slate-600 bg-slate-50'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              ) : currentTask.type === TaskType.SPEAKING ? (
+                <div className="flex flex-col items-center py-16 bg-slate-50 rounded-[48px] border-2 border-dashed border-slate-200 relative overflow-hidden group">
+                   {isRecording && (
+                     <div className="absolute inset-0 bg-rose-50/50 flex items-center justify-center animate-pulse">
+                        <div className="flex gap-2">
+                           {[1,2,3,4,5].map(i => <div key={i} className="w-2 bg-rose-400 rounded-full animate-grow" style={{ animationDelay: `${i*0.1}s`, height: '40px' }}></div>)}
+                        </div>
+                     </div>
                    )}
-                 </button>
-               )}
-               
-               {isSubmitting && (
-                 <div className="flex flex-col items-center gap-4">
-                    <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-sm font-bold text-indigo-600 animate-pulse">Gemini is listening...</p>
-                 </div>
-               )}
-            </div>
-          )}
+                   
+                   {!feedback && !isSubmitting && (
+                     <>
+                        <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest mb-8">{isRecording ? `Recording... ${recordingTime}s` : 'Press and hold to speak'}</p>
+                        <button
+                          onMouseDown={startRecording}
+                          onMouseUp={stopRecording}
+                          onTouchStart={startRecording}
+                          onTouchEnd={stopRecording}
+                          className={`w-32 h-32 rounded-[40px] flex items-center justify-center transition-all shadow-2xl relative z-10 ${
+                            isRecording ? 'bg-rose-500 scale-110 shadow-rose-100' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'
+                          }`}
+                        >
+                          {isRecording ? (
+                            <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="4" /></svg>
+                          ) : (
+                            <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+                          )}
+                        </button>
+                     </>
+                   )}
+                   
+                   {isSubmitting && (
+                     <div className="flex flex-col items-center gap-6">
+                        <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-xs font-black text-indigo-600 uppercase tracking-widest animate-pulse">Gemini is evaluating...</p>
+                     </div>
+                   )}
+                </div>
+              ) : (
+                <textarea
+                  value={answer}
+                  onChange={(e) => setAnswer(e.target.value)}
+                  disabled={!!feedback || isSubmitting}
+                  placeholder="Your linguistic answer here..."
+                  className="w-full h-44 p-8 bg-slate-50 border-2 border-slate-100 rounded-[40px] focus:border-indigo-600 focus:bg-white outline-none text-xl font-bold transition-all shadow-inner resize-none"
+                />
+              )}
+           </div>
 
-          {!feedback && !isSpeakingTask && (
-            <button
-              onClick={handleSubmit}
-              disabled={!answer.trim() || isSubmitting}
-              className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:bg-slate-800 transition-all disabled:opacity-50"
-            >
-              {isSubmitting ? 'Analyzing mastery...' : 'Check Answer'}
-            </button>
-          )}
+           {!feedback && currentTask.type !== TaskType.SPEAKING && (
+              <div className="mt-10 flex justify-end">
+                <button
+                  onClick={handleSubmit}
+                  disabled={(!answer.trim() && currentTask.type !== TaskType.READING) || isSubmitting}
+                  className="px-12 py-5 bg-slate-900 text-white rounded-3xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 transition-all shadow-xl disabled:opacity-50 active:scale-95"
+                >
+                  {isSubmitting ? 'Verifying...' : 'Check Answer'}
+                </button>
+              </div>
+           )}
 
-          {feedback && (
-            <div className={`p-8 rounded-3xl border-2 ${styles?.bg} ${styles?.border} space-y-4 animate-slideUp`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{styles?.icon}</span>
-                  <span className={`font-bold text-lg ${styles?.text}`}>{feedback.type.replace('_', ' ')}</span>
+           {feedback && (
+            <div className={`mt-10 p-10 rounded-[48px] border-2 animate-slideUp ${styles?.bg} ${styles?.border}`}>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                  <span className="text-4xl">{styles?.icon}</span>
+                  <div>
+                    <span className={`font-black text-xs uppercase tracking-widest ${styles?.text}`}>{feedback.type.replace('_', ' ')}</span>
+                    <p className="text-slate-700 font-bold mt-1">{feedback.explanation}</p>
+                  </div>
                 </div>
                 {feedback.score !== undefined && (
-                  <div className={`text-2xl font-black ${feedback.score > 60 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  <div className={`text-4xl font-black shrink-0 ${feedback.score > 60 ? 'text-emerald-600' : 'text-red-500'}`}>
                     {feedback.score}%
                   </div>
                 )}
               </div>
+              
+              {feedback.correction && feedback.type !== FeedbackType.PERFECT && (
+                <div className="mt-6 p-6 bg-white/50 rounded-3xl border border-white">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Coach Correction</p>
+                  <p className="text-slate-800 font-bold">{feedback.correction}</p>
+                </div>
+              )}
+
               <button
                 onClick={handleNext}
-                className={`w-full py-4 mt-4 rounded-2xl font-bold text-white transition-all shadow-lg ${
+                className={`w-full py-6 mt-10 rounded-[28px] font-black uppercase text-sm tracking-widest text-white transition-all shadow-2xl active:scale-95 ${
                   !isFailedScore ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200' : 'bg-slate-800 hover:bg-slate-900'
                 }`}
               >
-                {!isFailedScore ? (currentActivityIndex < lesson.activities.length - 1 ? 'Next Activity' : 'Finish Lesson') : 'Try Again'}
+                {!isFailedScore ? (currentTaskIndex < lessonTasks.length - 1 ? 'Next Task' : 'Finish Module') : 'Try This Task Again'}
               </button>
             </div>
           )}
@@ -407,6 +364,13 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
         }
         .animate-grow {
           animation: grow 0.8s ease-in-out infinite;
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slideUp {
+          animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
       `}</style>
     </div>

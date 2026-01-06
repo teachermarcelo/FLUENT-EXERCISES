@@ -32,6 +32,24 @@ export enum FeedbackType {
   INCORRECT = 'INCORRECT'
 }
 
+export enum TaskType {
+  WRITING = 'WRITING',
+  SPEAKING = 'SPEAKING',
+  READING = 'READING',
+  LISTENING = 'LISTENING'
+}
+
+export interface LessonTask {
+  id: string;
+  type: TaskType;
+  question: string;
+  targetText?: string; // For speaking or specific reading tasks
+  options?: string[]; // For multiple choice reading tasks
+  audioText?: string; // For listening tasks (model reads/simulates)
+  xpReward: number;
+  skillImpact: 'speaking' | 'listening' | 'reading' | 'writing';
+}
+
 export interface AIFeedback {
   type: FeedbackType;
   correction: string;
