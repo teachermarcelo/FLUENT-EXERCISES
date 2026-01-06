@@ -98,13 +98,13 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
         setFeedback(result);
         setIsSubmitting(false);
       };
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
       setFeedback({
         type: FeedbackType.INCORRECT,
         score: 0,
-        explanation: "Error processing audio.",
-        correction: "Please try again."
+        explanation: "Verification failed.",
+        correction: e.message === "API_KEY_MISSING" ? "API Key não configurada." : "Falha ao processar áudio."
       });
       setIsSubmitting(false);
     }
@@ -118,13 +118,13 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
     try {
       const result = await analyzeAnswer(currentTask.question, answer);
       setFeedback(result);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
       setFeedback({
         type: FeedbackType.INCORRECT,
         score: 0,
         explanation: "Verification failed.",
-        correction: "AI teacher is momentarily unavailable."
+        correction: e.message === "API_KEY_MISSING" ? "A chave API não foi injetada no Vercel." : "Professor IA temporariamente offline."
       });
     } finally {
       setIsSubmitting(false);
@@ -134,7 +134,7 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
   const handleNext = () => {
     const isPass = (feedback?.score ?? 100) > 60;
     
-    if (isPass) {
+    if (isPass && feedback?.type !== FeedbackType.INCORRECT) {
       setTotalXpEarned(prev => prev + (currentTask.xpReward || 0));
       
       if (currentTaskIndex < lessonTasks.length - 1) {
