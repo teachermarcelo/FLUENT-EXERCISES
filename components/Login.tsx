@@ -14,12 +14,17 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const db = JSON.parse(localStorage.getItem('lingualeap_db') || '[]');
-    const user = db.find((u: any) => u.username === username && u.password === password);
+    
+    // Busca robusta: ignora caixa alta/baixa e espaços extras
+    const user = db.find((u: any) => 
+      u.username.toLowerCase().trim() === username.toLowerCase().trim() && 
+      u.password === password
+    );
 
     if (user) {
       onLogin(user);
     } else {
-      setError('Invalid credentials. (Hint: admin/123)');
+      setError('Invalid credentials. Check your username and password.');
     }
   };
 
@@ -44,7 +49,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-600 outline-none transition-all"
-              placeholder="Enter username"
+              placeholder="e.g. admin or teacher marcelo"
               required
             />
           </div>
@@ -60,7 +65,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             />
           </div>
 
-          {error && <p className="text-red-500 text-sm font-bold text-center">{error}</p>}
+          {error && (
+            <div className="bg-red-50 text-red-600 p-3 rounded-xl text-xs font-bold text-center border border-red-100 animate-pulse">
+              {error}
+            </div>
+          )}
 
           <button 
             type="submit"
@@ -69,6 +78,18 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             Sign In
           </button>
         </form>
+        
+        <div className="pt-4 border-t border-slate-50 text-center">
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Initial Access Hints</p>
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            <div className="p-2 bg-slate-50 rounded-lg text-[9px] text-slate-500">
+              Admin: <b>admin</b> / 123
+            </div>
+            <div className="p-2 bg-slate-50 rounded-lg text-[9px] text-slate-500">
+              Teacher: <b>teacher marcelo</b> / 123456
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

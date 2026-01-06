@@ -10,14 +10,23 @@ import LevelSelector from './components/LevelSelector';
 import Modules from './components/Modules';
 import AdminTab from './components/AdminTab';
 import TeacherTab from './components/TeacherTab';
+import NotificationTab from './components/NotificationTab';
 import Login from './components/Login';
 import { UserProgress, ProficiencyLevel } from './types';
 
 // Mock DB Initializer
 const initDB = () => {
-  const db = localStorage.getItem('lingualeap_db');
-  if (!db) {
-    const adminUser: UserProgress = {
+  const dbStr = localStorage.getItem('lingualeap_db');
+  let db: UserProgress[] = dbStr ? JSON.parse(dbStr) : [];
+  
+  const hasAdmin = db.some(u => u.username.toLowerCase() === 'admin');
+  const hasMarcelo = db.some(u => u.username.toLowerCase() === 'teacher marcelo');
+  const hasGestor = db.some(u => u.username.toLowerCase() === 'gestor paid');
+
+  let updated = false;
+
+  if (!hasAdmin) {
+    db.push({
       id: 'admin-0',
       username: 'admin',
       password: '123',
@@ -28,9 +37,12 @@ const initDB = () => {
       completedLessons: [],
       skills: { speaking: 100, listening: 100, reading: 100, writing: 100 },
       certificates: []
-    };
+    });
+    updated = true;
+  }
 
-    const teacherMarcelo: UserProgress = {
+  if (!hasMarcelo) {
+    db.push({
       id: 'teacher-marcelo',
       username: 'teacher marcelo',
       password: '123456',
@@ -43,9 +55,12 @@ const initDB = () => {
       certificates: [],
       email: 'teacher@gmail.com',
       whatsapp: '41999653041'
-    };
+    });
+    updated = true;
+  }
 
-    const studentGestor: UserProgress = {
+  if (!hasGestor) {
+    db.push({
       id: 'student-gestor',
       username: 'gestor paid',
       password: '123456',
@@ -58,9 +73,12 @@ const initDB = () => {
       certificates: [],
       email: 'gestorpaid@gmail.com',
       whatsapp: '41999653041'
-    };
+    });
+    updated = true;
+  }
 
-    localStorage.setItem('lingualeap_db', JSON.stringify([adminUser, teacherMarcelo, studentGestor]));
+  if (updated || !dbStr) {
+    localStorage.setItem('lingualeap_db', JSON.stringify(db));
   }
 };
 
@@ -128,6 +146,11 @@ const AppContent: React.FC = () => {
             {/* Rota Teacher */}
             {(currentUser.role === 'teacher' || currentUser.role === 'admin') && (
               <Route path="/teacher" element={<TeacherTab currentUser={currentUser} />} />
+            )}
+
+            {/* Rota Notificações */}
+            {(currentUser.role === 'teacher' || currentUser.role === 'admin') && (
+              <Route path="/notifications" element={<NotificationTab currentUser={currentUser} />} />
             )}
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
