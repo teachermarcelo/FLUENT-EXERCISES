@@ -1,8 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { UserProgress, FeedbackType, AIFeedback } from '../types';
-import { analyzeAnswer, analyzePronunciation } from '../geminiService';
+import { UserProgress, FeedbackType, AIFeedback } from '../types.ts';
+import { analyzeAnswer, analyzePronunciation } from '../geminiService.ts';
 
 interface LessonPlayerProps {
   user: UserProgress;
@@ -17,15 +17,13 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
 
-  // Estados de Gravação
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
 
-  // Mock de exercício de fala (Speaking)
-  const isSpeakingTask = id?.includes('speaking') || id === 'travel-2'; // Exemplo
+  const isSpeakingTask = id?.includes('speaking') || id === 'travel-2';
   const lessonTitle = isSpeakingTask ? "Speaking Practice" : "Professional Greetings";
   const question = isSpeakingTask ? "Repeat this phrase: 'I'd like to book a flight to London, please.'" : "How would you introduce yourself formally in a business meeting?";
   const targetText = "I'd like to book a flight to London, please.";
@@ -176,12 +174,6 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
             {isSpeakingTask ? 'Speaking Mission' : 'Writing Mission'}
           </p>
           <h3 className="text-xl font-semibold text-slate-900 mb-4">{question}</h3>
-          {isSpeakingTask && (
-             <div className="bg-indigo-50 p-4 rounded-2xl flex items-center gap-3 text-indigo-700 mb-4">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
-                <span className="font-medium italic">Listen carefully and repeat</span>
-             </div>
-          )}
         </div>
 
         <div className="space-y-4">
@@ -220,7 +212,6 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
                    )}
                  </button>
                )}
-               {!isRecording && !feedback && !isSubmitting && <p className="mt-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Hold to Record</p>}
                
                {isSubmitting && (
                  <div className="flex flex-col items-center gap-4">
@@ -254,32 +245,6 @@ const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) =
                   </div>
                 )}
               </div>
-
-              {feedback.score !== undefined && (
-                <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                   <div 
-                    className={`h-full transition-all duration-1000 ${feedback.score > 60 ? 'bg-emerald-500' : 'bg-red-500'}`} 
-                    style={{ width: `${feedback.score}%` }}
-                   />
-                </div>
-              )}
-
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase mb-1">{isSpeakingTask ? 'Analysis' : 'Better Version'}</p>
-                <p className="text-lg font-semibold text-slate-900">&quot;{feedback.correction}&quot;</p>
-              </div>
-
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Feedback</p>
-                <p className="text-slate-600 leading-relaxed">{feedback.explanation}</p>
-              </div>
-
-              {isFailedScore && (
-                 <div className="bg-red-100 text-red-700 p-4 rounded-2xl text-sm font-bold text-center">
-                    Score below 60%. Try practicing the specific sounds mentioned above.
-                 </div>
-              )}
-
               <button
                 onClick={handleNext}
                 className={`w-full py-4 mt-4 rounded-2xl font-bold text-white transition-all shadow-lg ${

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { ProficiencyLevel } from '../types';
-import { getDiagnosticResult } from '../geminiService';
+import { ProficiencyLevel } from '../types.ts';
+import { getDiagnosticResult } from '../geminiService.ts';
 
 interface DiagnosticTestProps {
   onComplete: (level: ProficiencyLevel) => void;
