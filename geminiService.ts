@@ -1,106 +1,92 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { FeedbackType, AIFeedback, ProficiencyLevel } from "./types";
+import { UserProgress, FeedbackType, AIFeedback } from "./types";
+
+// Inicialização única seguindo as regras da SDK
+const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
- * Analyzes a user's text answer based on a question and context.
+ * AI Immersion - Conversação Inteligente
  */
-export async function analyzeAnswer(
-  question: string,
-  userAnswer: string,
-  context?: string
-): Promise<AIFeedback> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = `
-    Evaluate this English response.
-    Context: "${question}"
-    User Answer: "${userAnswer}"
-    Return JSON with: type (PERFECT, IMPROVABLE, UNNATURAL, INCORRECT), correction, explanation.
-  `;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            type: { type: Type.STRING, enum: Object.values(FeedbackType) },
-            correction: { type: Type.STRING },
-            explanation: { type: Type.STRING }
-          },
-          required: ["type", "correction", "explanation"]
-        }
-      }
-    });
-    return JSON.parse(response.text || "{}");
-  } catch (e) {
-    console.error("Gemini analyzeAnswer error:", e);
-    return { type: FeedbackType.INCORRECT, correction: "Error", explanation: "Connection issues." };
-  }
-}
-
-/**
- * Generates an immersive response for a chat conversation with an English coach.
- */
-export async function generateImmersiveResponse(
-  history: any[],
-  topic: string,
-  level: string
-): Promise<string> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+export async function generateImmersiveResponse(history: any[], topic: string, level: string): Promise<string> {
+  const ai = getAI();
   
-  // Format history for the SDK: it expects an array of { role, parts: [{ text }] }
+  // Mapeamento correto do histórico para a SDK
   const formattedHistory = history.map(msg => ({
-    role: msg.role,
+    role: msg.role === 'user' ? 'user' : 'model',
     parts: [{ text: msg.parts[0].text }]
   }));
 
-  const systemInstruction = `
-    You are an English coach at FLUENT IMMERSION.
-    Topic: ${topic}. Student Level: ${level}.
-    RULES:
-    1. Always respond naturally to the user first.
-    2. Correct mistakes using *asterisks* (e.g., "I *went* to the mall" instead of "I go").
-    3. Keep it interactive. Always end with a question related to ${topic}.
-    4. Maintain the "Sandwich Feedback" method: Praise/Response -> Correction -> New Question.
-  `;
+  const systemInstruction = `You are a world-class English Coach for the platform FLUENT IMMERSION. 
+  Topic: ${topic}. Student Level: ${level}. 
+  CRITICAL RULE: Correct the student using the sandwich method (Praise -> Subtle correction with *asterisks* -> Follow-up question). 
+  Keep the conversation natural, immersive, and encouraging. Never break character.`;
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: formattedHistory,
       config: { 
-        systemInstruction,
-        temperature: 0.7,
-        topP: 0.95
+        systemInstruction, 
+        temperature: 0.8,
+        topP: 0.95 
       }
     });
-    return response.text || "I'm sorry, I couldn't process that. Can you repeat?";
+    // Uso da propriedade .text diretamente conforme diretriz
+    return response.text || "I'm listening, please continue!";
   } catch (e) {
-    console.error("Gemini generateImmersiveResponse error:", e);
-    return "Network error. Let's try again! (Please check your API configuration)";
+    console.error("Gemini Error:", e);
+    return "The immersion lab is currently recalibrating. Please send your message again in a few seconds.";
   }
 }
 
 /**
- * Evaluates a set of diagnostic responses to determine a student's proficiency level.
+ * Relatório Pedagógico - 5 Pontos de Melhoria
  */
-export async function getDiagnosticResult(responses: { question: string, answer: string }[]): Promise<{
-  level: ProficiencyLevel;
-  feedback: string;
-  strengths: string[];
-  areasToImprove: string[];
-}> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const dataString = responses.map(r => `Q: ${r.question}\nA: ${r.answer}`).join('\n\n');
-  const prompt = `Analyze these student responses and determine their English level (A1-C2).
+export async function generatePedagogicalReport(student: UserProgress): Promise<string[]> {
+  const ai = getAI();
+  const prompt = `Analyze this student performance data and provide EXACTLY 5 high-impact pedagogical tips for their English improvement.
+  Level: ${student.level}
+  XP: ${student.xp}
+  Speaking Skill: ${student.skills.speaking}%
+  Listening Skill: ${student.skills.listening}%
+  Writing Skill: ${student.skills.writing}%
+  Reading Skill: ${student.skills.reading}%
   
-  Responses:
-  ${dataString}`;
+  Guidelines:
+  1. Be professional and encouraging.
+  2. Focus on the lowest skill scores.
+  3. Suggest practical daily exercises.
+  
+  OUTPUT FORMAT: A JSON array of 5 strings in Portuguese (PT-BR).`;
 
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-preview",
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: { 
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        }
+      }
+    });
+    return JSON.parse(response.text || "[]");
+  } catch (e) {
+    return [
+      "Pratique 15 minutos de conversação diária para elevar seu speaking.",
+      "Ouça podcasts no nível " + student.level + " durante o trajeto para o trabalho.",
+      "Tente escrever um pequeno diário em inglês sobre seu dia.",
+      "Revise as estruturas gramaticais do módulo atual.",
+      "Utilize o AI Immersion Lab para testar vocabulário novo em contextos reais."
+    ];
+  }
+}
+
+export async function getDiagnosticResult(responses: { question: string, answer: string }[]): Promise<any> {
+  const ai = getAI();
+  const prompt = `Evaluate the following test: ${JSON.stringify(responses)}. Determine CEFR level.`;
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
@@ -110,7 +96,7 @@ export async function getDiagnosticResult(responses: { question: string, answer:
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            level: { type: Type.STRING, enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] },
+            level: { type: Type.STRING },
             feedback: { type: Type.STRING },
             strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
             areasToImprove: { type: Type.ARRAY, items: { type: Type.STRING } }
@@ -120,43 +106,54 @@ export async function getDiagnosticResult(responses: { question: string, answer:
       }
     });
     return JSON.parse(response.text || "{}");
-  } catch (e) {
-    console.error("Diagnostic analysis failed", e);
-    throw e;
-  }
+  } catch (e) { throw e; }
 }
 
-/**
- * Analyzes pronunciation of audio data against a target text.
- */
-export async function analyzePronunciation(
-  targetText: string,
-  base64Audio: string,
-  mimeType: string
-): Promise<AIFeedback> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = `
-    Evaluate pronunciation against: "${targetText}".
-    Return JSON: type (PERFECT, IMPROVABLE, UNNATURAL, INCORRECT), correction, explanation, score (0-100).
-  `;
-
+export async function analyzeAnswer(question: string, answer: string): Promise<AIFeedback> {
+  const ai = getAI();
+  const prompt = `Evaluate: Q: ${question} A: ${answer}`;
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: [
-        {
-          parts: [
-            { inlineData: { mimeType, data: base64Audio } },
-            { text: prompt }
-          ]
-        }
-      ],
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            type: { type: Type.STRING, enum: Object.values(FeedbackType) },
+            type: { type: Type.STRING },
+            correction: { type: Type.STRING },
+            explanation: { type: Type.STRING },
+            naturalAlternative: { type: Type.STRING },
+            score: { type: Type.NUMBER }
+          },
+          required: ["type", "correction", "explanation", "score"]
+        }
+      }
+    });
+    return JSON.parse(response.text || "{}");
+  } catch (e) {
+    return { type: FeedbackType.INCORRECT, correction: "Error", explanation: "System busy.", score: 0 };
+  }
+}
+
+export async function analyzePronunciation(targetText: string, base64Audio: string, mimeType: string): Promise<AIFeedback> {
+  const ai = getAI();
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-preview",
+      contents: {
+        parts: [
+          { text: `Evaluate pronunciation of: "${targetText}"` },
+          { inlineData: { data: base64Audio, mimeType: mimeType } }
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            type: { type: Type.STRING },
             correction: { type: Type.STRING },
             explanation: { type: Type.STRING },
             score: { type: Type.NUMBER }
@@ -167,7 +164,6 @@ export async function analyzePronunciation(
     });
     return JSON.parse(response.text || "{}");
   } catch (e) {
-    console.error("Pronunciation analysis failed", e);
-    return { type: FeedbackType.INCORRECT, correction: "N/A", explanation: "Audio error.", score: 0 };
+    return { type: FeedbackType.INCORRECT, correction: "Audio error", explanation: "Process failed.", score: 0 };
   }
 }
