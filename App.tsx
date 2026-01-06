@@ -18,7 +18,7 @@ const initDB = () => {
     let db: UserProgress[] = dbStr ? JSON.parse(dbStr) : [];
     
     const hasAdmin = db.some(u => u.username.toLowerCase() === 'admin');
-    const hasMarcelo = db.some(u => u.username.toLowerCase() === 'teacher marcelo');
+    const hasMarcelo = db.some(u => u.username.toLowerCase() === 'marcelo');
 
     let updated = false;
 
@@ -41,17 +41,17 @@ const initDB = () => {
     if (!hasMarcelo) {
       db.push({
         id: 'teacher-marcelo',
-        username: 'teacher marcelo',
+        username: 'marcelo',
         password: '123',
         role: 'teacher',
         level: 'C2',
         xp: 500,
         streak: 10,
         completedLessons: [],
-        skills: { speaking: 100, listening: 100, reading: 100, writing: 100 },
+        skills: { speaking: 85, listening: 90, reading: 95, writing: 80 },
         certificates: [],
-        email: 'teacher@gmail.com',
-        whatsapp: '41999653041'
+        email: 'marcelo@fluentimmersion.com',
+        whatsapp: '+5541999999999'
       });
       updated = true;
     }
@@ -61,7 +61,7 @@ const initDB = () => {
     }
   } catch (e) {
     console.error("Critical error initializing database", e);
-    localStorage.removeItem('lingualeap_db'); // Reset if corrupted
+    localStorage.removeItem('lingualeap_db');
   }
 };
 
@@ -70,9 +70,7 @@ const AppContent: React.FC = () => {
     try {
       const saved = localStorage.getItem('lingualeap_current_session');
       return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   });
 
   const navigate = useNavigate();
@@ -82,12 +80,36 @@ const AppContent: React.FC = () => {
   }, []);
 
   const handleLogin = (user: UserProgress) => {
-    setCurrentUser(user);
-    localStorage.setItem('lingualeap_current_session', JSON.stringify(user));
+    const loginTime = new Date().toISOString();
+    const updatedUser = { ...user, lastLogin: loginTime };
+    setCurrentUser(updatedUser);
+    localStorage.setItem('lingualeap_current_session', JSON.stringify(updatedUser));
+    
+    // Sync with DB
+    const db = JSON.parse(localStorage.getItem('lingualeap_db') || '[]');
+    localStorage.setItem('lingualeap_db', JSON.stringify(db.map((u: UserProgress) => u.id === user.id ? updatedUser : u)));
+    
     navigate('/dashboard');
   };
 
   const handleLogout = () => {
+    if (currentUser) {
+      const logoutTime = new Date();
+      const loginTime = currentUser.lastLogin ? new Date(currentUser.lastLogin) : logoutTime;
+      const sessionSeconds = Math.floor((logoutTime.getTime() - loginTime.getTime()) / 1000);
+      
+      const db = JSON.parse(localStorage.getItem('lingualeap_db') || '[]');
+      const updatedDb = db.map((u: UserProgress) => 
+        u.id === currentUser.id 
+          ? { 
+              ...u, 
+              lastLogout: logoutTime.toISOString(), 
+              totalSessionTime: (u.totalSessionTime || 0) + sessionSeconds 
+            } 
+          : u
+      );
+      localStorage.setItem('lingualeap_db', JSON.stringify(updatedDb));
+    }
     setCurrentUser(null);
     localStorage.removeItem('lingualeap_current_session');
     navigate('/login');

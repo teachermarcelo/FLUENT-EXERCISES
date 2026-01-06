@@ -17,9 +17,11 @@ export interface UserProgress {
     reading: number;
     writing: number;
   };
-  teacherId?: string; // Para alunos: quem é o professor
+  teacherId?: string;
   lastLogin?: string;
-  certificates: string[]; // Níveis concluídos
+  lastLogout?: string;
+  totalSessionTime?: number; // in seconds
+  certificates: string[];
   email?: string;
   whatsapp?: string;
 }
