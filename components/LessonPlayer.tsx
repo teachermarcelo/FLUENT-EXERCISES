@@ -1,0 +1,309 @@
+
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { UserProgress, FeedbackType, AIFeedback } from '../types';
+import { analyzeAnswer, analyzePronunciation } from '../geminiService';
+
+interface LessonPlayerProps {
+  user: UserProgress;
+  onUpdateProgress: (user: UserProgress) => void;
+}
+
+const LessonPlayer: React.FC<LessonPlayerProps> = ({ user, onUpdateProgress }) => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [answer, setAnswer] = useState('');
+  const [feedback, setFeedback] = useState<AIFeedback | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
+
+  // Estados de Gravação
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<number | null>(null);
+
+  // Mock de exercício de fala (Speaking)
+  const isSpeakingTask = id?.includes('speaking') || id === 'travel-2'; // Exemplo
+  const lessonTitle = isSpeakingTask ? "Speaking Practice" : "Professional Greetings";
+  const question = isSpeakingTask ? "Repeat this phrase: 'I'd like to book a flight to London, please.'" : "How would you introduce yourself formally in a business meeting?";
+  const targetText = "I'd like to book a flight to London, please.";
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        await handleAudioSubmit(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      timerRef.current = window.setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (err) {
+      alert("Microphone access denied. Please enable it in settings.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+  };
+
+  const handleAudioSubmit = async (blob: Blob) => {
+    setIsSubmitting(true);
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = async () => {
+        const base64Audio = (reader.result as string).split(',')[1];
+        const result = await analyzePronunciation(targetText, base64Audio, 'audio/webm');
+        setFeedback(result);
+        setIsSubmitting(false);
+      };
+    } catch (e) {
+      console.error(e);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!answer.trim() || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      const result = await analyzeAnswer(question, answer);
+      setFeedback(result);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleNext = () => {
+    const isPass = (feedback?.score ?? 100) > 60;
+    
+    if (isPass && (feedback?.type === FeedbackType.PERFECT || feedback?.type === FeedbackType.IMPROVABLE)) {
+      setIsComplete(true);
+      const updatedUser = {
+        ...user,
+        xp: user.xp + 50,
+        skills: { 
+          ...user.skills, 
+          [isSpeakingTask ? 'speaking' : 'writing']: Math.min(100, user.skills[isSpeakingTask ? 'speaking' : 'writing'] + 5) 
+        }
+      };
+      onUpdateProgress(updatedUser);
+    } else {
+      setFeedback(null);
+      setAnswer('');
+    }
+  };
+
+  const getFeedbackStyles = (type: FeedbackType) => {
+    switch (type) {
+      case FeedbackType.PERFECT: return { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', icon: '🟢' };
+      case FeedbackType.IMPROVABLE: return { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', icon: '🔵' };
+      case FeedbackType.UNNATURAL: return { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', icon: '🟠' };
+      case FeedbackType.INCORRECT: return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', icon: '🔴' };
+    }
+  };
+
+  if (isComplete) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 animate-fadeIn">
+        <div className="w-32 h-32 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 mb-8 scale-110 animate-pulse">
+           <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+        </div>
+        <h2 className="text-4xl font-bold font-heading mb-4">Mastery Achieved!</h2>
+        <p className="text-slate-500 mb-8">You earned 50 XP and improved your skills.</p>
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="px-12 py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200"
+        >
+          Back to Dashboard
+        </button>
+      </div>
+    );
+  }
+
+  const styles = feedback ? getFeedbackStyles(feedback.type) : null;
+  const isFailedScore = feedback?.score !== undefined && feedback.score <= 60;
+
+  return (
+    <div className="max-w-3xl mx-auto py-4 space-y-8 animate-fadeIn">
+      <header className="flex items-center justify-between border-b border-slate-200 pb-6">
+        <div>
+          <button onClick={() => navigate('/dashboard')} className="text-slate-400 hover:text-slate-600 mb-2 flex items-center gap-1 text-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+            Cancel Session
+          </button>
+          <h2 className="text-2xl font-bold font-heading">{lessonTitle}</h2>
+        </div>
+        <div className="text-right">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Exercise 1/5</p>
+          <div className="w-32 h-2 bg-slate-100 rounded-full mt-2 overflow-hidden">
+            <div className="w-1/5 h-full bg-indigo-600" />
+          </div>
+        </div>
+      </header>
+
+      <div className="space-y-6">
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+          <p className="text-xs font-bold text-indigo-600 mb-2 uppercase tracking-wide">
+            {isSpeakingTask ? 'Speaking Mission' : 'Writing Mission'}
+          </p>
+          <h3 className="text-xl font-semibold text-slate-900 mb-4">{question}</h3>
+          {isSpeakingTask && (
+             <div className="bg-indigo-50 p-4 rounded-2xl flex items-center gap-3 text-indigo-700 mb-4">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+                <span className="font-medium italic">Listen carefully and repeat</span>
+             </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          {!isSpeakingTask ? (
+            <textarea
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+              disabled={!!feedback || isSubmitting}
+              placeholder="Type your response here..."
+              className="w-full h-40 p-6 bg-white border-2 border-slate-200 rounded-3xl focus:border-indigo-600 outline-none text-lg transition-all shadow-sm"
+            />
+          ) : (
+            <div className="flex flex-col items-center py-12 bg-white rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
+               {isRecording && (
+                 <div className="absolute inset-0 bg-red-50/50 flex items-center justify-center animate-pulse">
+                    <div className="flex gap-2">
+                       {[1,2,3,4,5].map(i => <div key={i} className="w-1 bg-red-400 rounded-full animate-grow" style={{ animationDelay: `${i*0.1}s`, height: '20px' }}></div>)}
+                    </div>
+                 </div>
+               )}
+               
+               <p className="text-slate-400 font-bold mb-6">{isRecording ? `Recording... ${recordingTime}s` : 'Ready to speak?'}</p>
+               
+               {!feedback && !isSubmitting && (
+                 <button
+                   onMouseDown={startRecording}
+                   onMouseUp={stopRecording}
+                   className={`w-24 h-24 rounded-full flex items-center justify-center transition-all shadow-xl ${
+                     isRecording ? 'bg-red-500 scale-110 shadow-red-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'
+                   }`}
+                 >
+                   {isRecording ? (
+                     <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+                   ) : (
+                     <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+                   )}
+                 </button>
+               )}
+               {!isRecording && !feedback && !isSubmitting && <p className="mt-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Hold to Record</p>}
+               
+               {isSubmitting && (
+                 <div className="flex flex-col items-center gap-4">
+                    <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-sm font-bold text-indigo-600 animate-pulse">Gemini is listening...</p>
+                 </div>
+               )}
+            </div>
+          )}
+
+          {!feedback && !isSpeakingTask && (
+            <button
+              onClick={handleSubmit}
+              disabled={!answer.trim() || isSubmitting}
+              className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:bg-slate-800 transition-all disabled:opacity-50"
+            >
+              {isSubmitting ? 'Analyzing mastery...' : 'Check Answer'}
+            </button>
+          )}
+
+          {feedback && (
+            <div className={`p-8 rounded-3xl border-2 ${styles?.bg} ${styles?.border} space-y-4 animate-slideUp`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">{styles?.icon}</span>
+                  <span className={`font-bold text-lg ${styles?.text}`}>{feedback.type.replace('_', ' ')}</span>
+                </div>
+                {feedback.score !== undefined && (
+                  <div className={`text-2xl font-black ${feedback.score > 60 ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {feedback.score}%
+                  </div>
+                )}
+              </div>
+
+              {feedback.score !== undefined && (
+                <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                   <div 
+                    className={`h-full transition-all duration-1000 ${feedback.score > 60 ? 'bg-emerald-500' : 'bg-red-500'}`} 
+                    style={{ width: `${feedback.score}%` }}
+                   />
+                </div>
+              )}
+
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase mb-1">{isSpeakingTask ? 'Analysis' : 'Better Version'}</p>
+                <p className="text-lg font-semibold text-slate-900">&quot;{feedback.correction}&quot;</p>
+              </div>
+
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Feedback</p>
+                <p className="text-slate-600 leading-relaxed">{feedback.explanation}</p>
+              </div>
+
+              {isFailedScore && (
+                 <div className="bg-red-100 text-red-700 p-4 rounded-2xl text-sm font-bold text-center">
+                    Score below 60%. Try practicing the specific sounds mentioned above.
+                 </div>
+              )}
+
+              <button
+                onClick={handleNext}
+                className={`w-full py-4 mt-4 rounded-2xl font-bold text-white transition-all shadow-lg ${
+                  !isFailedScore ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200' : 'bg-slate-800 hover:bg-slate-900'
+                }`}
+              >
+                {!isFailedScore ? 'Continue' : 'Try Again'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      <style>{`
+        @keyframes grow {
+          0%, 100% { transform: scaleY(1); }
+          50% { transform: scaleY(2.5); }
+        }
+        .animate-grow {
+          animation: grow 0.8s ease-in-out infinite;
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default LessonPlayer;

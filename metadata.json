@@ -1,0 +1,7 @@
+{
+  "name": "LinguaLeap - AI Powered English Learning",
+  "description": "The world's most intelligent English learning platform, featuring adaptive learning paths, real-time AI feedback, and immersive contextual modules from A1 to C2.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
