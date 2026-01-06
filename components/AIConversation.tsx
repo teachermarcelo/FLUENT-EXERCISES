@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { UserProgress } from '../types';
-import { GoogleGenAI } from "@google/genai";
+import { generateImmersiveResponse } from '../geminiService';
 
 interface Message {
   role: 'user' | 'model';
@@ -23,7 +23,7 @@ const AIConversation: React.FC<{ user: UserProgress }> = ({ user }) => {
   const initChat = (selected: 'grammar' | 'travel' | 'general') => {
     setTopic(selected);
     const greetings = {
-      grammar: "Welcome! I'm your Grammar Coach. I'll correct your mistakes sutilly while we chat. Ready?",
+      grammar: "Welcome! I'm your Grammar Coach. I'll correct your mistakes subtly while we chat. Ready?",
       travel: "Boarding call! I'm your travel assistant. Where are we heading today?",
       general: "Hello! Let's talk about anything you like. How was your day?"
     };
@@ -34,32 +34,16 @@ const AIConversation: React.FC<{ user: UserProgress }> = ({ user }) => {
     const text = manualText || input;
     if (!text.trim() || isTyping) return;
 
-    setMessages(prev => [...prev, { role: 'user', parts: [{ text }] }]);
+    const newMessages = [...messages, { role: 'user', parts: [{ text }] }] as Message[];
+    setMessages(newMessages);
     setInput('');
     setIsTyping(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const systemInstruction = `
-        You are an elite immersive English teacher in FLUENT IMMERSION.
-        Topic: ${topic}. User Level: ${user.level}.
-        
-        FEEDBACK METHOD: 'Sandwich Method'
-        1. Respond naturally to the user's content.
-        2. If there's a mistake, insert the correction between *asterisks* (e.g. "I went *have gone* there").
-        3. Never break the flow. End with a question to keep them talking.
-        4. Be encouraging and highly interactive.
-      `;
-
-      const chat = ai.chats.create({
-        model: 'gemini-3-flash-preview',
-        config: { systemInstruction }
-      });
-
-      const response = await chat.sendMessage({ message: text });
-      setMessages(prev => [...prev, { role: 'model', parts: [{ text: response.text }] }]);
+      const response = await generateImmersiveResponse(newMessages, topic!, user.level);
+      setMessages(prev => [...prev, { role: 'model', parts: [{ text: response }] }]);
     } catch (e) {
-      setMessages(prev => [...prev, { role: 'model', parts: [{ text: "Network error. Let's try again!" }] }]);
+      setMessages(prev => [...prev, { role: 'model', parts: [{ text: "Connection error. Let's try again!" }] }]);
     } finally {
       setIsTyping(false);
     }
@@ -68,14 +52,14 @@ const AIConversation: React.FC<{ user: UserProgress }> = ({ user }) => {
   const toggleMic = async () => {
     if (isRecording) {
       setIsRecording(false);
-      handleSend("Speech-to-text input simulated...");
+      handleSend("Speech-to-text input simulated based on audio input...");
     } else {
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
         setIsRecording(true);
-        setTimeout(() => { if(isRecording) toggleMic(); }, 4000);
+        setTimeout(() => { if(isRecording) toggleMic(); }, 3000);
       } catch (err) {
-        alert("Microfone bloqueado.");
+        alert("Mic permission denied.");
       }
     }
   };
@@ -103,7 +87,7 @@ const AIConversation: React.FC<{ user: UserProgress }> = ({ user }) => {
     <div className="max-w-4xl mx-auto h-[85vh] flex flex-col space-y-4 animate-fadeIn">
       <header className="bg-white p-6 rounded-[32px] border-b-8 border-b-indigo-600 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button onClick={()=>setTopic(null)} className="p-2 text-slate-400"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3"/></svg></button>
+          <button onClick={()=>setTopic(null)} className="p-2 text-slate-400 hover:text-indigo-600"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3"/></svg></button>
           <h2 className="text-xl font-black uppercase text-slate-900">{topic} SESSION</h2>
         </div>
         <div className="flex items-center gap-2">
@@ -121,15 +105,15 @@ const AIConversation: React.FC<{ user: UserProgress }> = ({ user }) => {
               </div>
             </div>
           ))}
-          {isTyping && <div className="flex justify-start animate-pulse"><div className="bg-white border p-6 rounded-[32px] rounded-bl-none text-slate-400 font-bold uppercase text-[10px]">IA is thinking...</div></div>}
+          {isTyping && <div className="flex justify-start animate-pulse"><div className="bg-white border p-6 rounded-[32px] rounded-bl-none text-slate-400 font-black uppercase text-[10px]">IA is coaching...</div></div>}
         </div>
 
         <div className="p-6 bg-white border-t flex gap-4">
           <button onClick={toggleMic} className={`p-5 rounded-2xl transition-all ${isRecording ? 'bg-red-500 text-white mic-pulse scale-110' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>
             <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
           </button>
-          <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSend()} placeholder="Type something to your teacher..." className="flex-1 p-5 rounded-2xl bg-slate-50 border-2 border-slate-50 focus:border-indigo-600 outline-none transition-all font-bold" />
-          <button onClick={()=>handleSend()} className="bg-indigo-600 text-white p-5 rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-100"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 12h14M13 5l7 7-7 7" strokeWidth="3" strokeLinecap="round"/></svg></button>
+          <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSend()} placeholder="Speak to your teacher..." className="flex-1 p-5 rounded-2xl bg-slate-50 border-2 border-slate-50 focus:border-indigo-600 outline-none transition-all font-bold" />
+          <button onClick={()=>handleSend()} disabled={!input.trim() || isTyping} className="bg-indigo-600 text-white p-5 rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-100 disabled:opacity-50"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 12h14M13 5l7 7-7 7" strokeWidth="3" strokeLinecap="round"/></svg></button>
         </div>
       </div>
     </div>
